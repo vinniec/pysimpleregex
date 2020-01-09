@@ -45,8 +45,8 @@ layout = [
 #calcolo pos finestra la creo 
 if sg.name == "PySimpleGUI":
     sloc, ssiz = get_curr_screen_geometry(sg.tkinter) 
-    span = map(sum, zip(sloc, map(lambda n: n//4, ssiz)))
-    window = sg.Window("rg", layout, location=span,
+    offset = map(sum, zip(sloc, map(lambda n: n//4, ssiz)))
+    window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))
 elif sg.name == "PySimpleGUIWeb":
     window = sg.Window("rg", layout, font=("Default", 20))
@@ -80,7 +80,7 @@ while True:
         if now()-start_cron >= parse_delay: 
             parse = False
             result = re.findall(regex, text)
-            result = [s for s in result if s]
+            # result = [s for s in result if s]
             lr = len(str(len(result)))
             result = [f"{n:0{lr}}) {s}" for n, s in enumerate(result,1)]
             result = "\n".join(result)
