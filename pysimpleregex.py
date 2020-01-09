@@ -28,7 +28,15 @@ sg.theme('BrightColors')
 
 
 layout = [
-    # ~ [sg.InputText(size=(20,10))] #una linea sola
+    [
+        sg.Checkbox("I", key="I", tooltip="IGNORECASE"),
+        sg.Checkbox("L", key="L", tooltip="LOCALE (only with byte pattern)", disabled=True),
+        sg.Checkbox("M", key="M", tooltip="MULTILINE"),
+        sg.Checkbox("S", key="S", tooltip="DOTALL"),
+        sg.Checkbox("U", key="U", tooltip="UNICODE (default if not ascii)", disabled=True),
+        sg.Checkbox("X", key="X", tooltip="VERBOSE"),
+        sg.Checkbox("A", key="A", tooltip="ASCII"),
+    ],
     [sg.Multiline(key="regbox", size=(30,3), autoscroll=True,
                   focus=True, # ~ enable_events=True, 
                   enter_submits=True, do_not_clear=True,
@@ -56,7 +64,8 @@ elif sg.name == "PySimpleGUIWeb":
 parse = False
 parse_delay = 1
 start_cron = now()
-regex = regtext = text = ""
+regex = regtext = text = flags_old = ""
+flags_cmb = "ILMSUXA"
 while True:
     #ogni secondo rilascio uno stato
     event, values = window.read(timeout=1000)  #un controllo al sec
@@ -66,9 +75,14 @@ while True:
     
     if event is None:   #se premo su esc, escio
         break 
-    if regtext != values['regbox'][:-1]: #se la regex è cambiata l'aggiorno
-        regtext = values['regbox'][:-1]  #[:-1] tolgo l'\n alla fine
-        try:                regex = re.compile(rf"""{regtext}""")
+
+    #se la regex è cambiata l'aggiorno, [:-1] tolgo l'\n alla fine
+    flags_new = [f for f in flags_cmb if values[f]]
+    if (flags_old != flags_new) or (regtext != values['regbox'][:-1]):
+        flags_old = flags_new
+        flags_sum = sum([eval("re."+f) for f in flags_old])
+        regtext = values['regbox'][:-1]
+        try:                regex = re.compile(regtext, flags_sum)
         except re.error:    regex = ''
         parse = True
         start_cron = now()
@@ -80,7 +94,8 @@ while True:
         if now()-start_cron >= parse_delay: 
             parse = False
             result = re.findall(regex, text)
-            # result = [s for s in result if s]
+            # if not regtext: #con "" findall restituisce risultati vuoti
+            #     result = [s for s in result if s] #per ora consento
             lr = len(str(len(result)))
             result = [f"{n:0{lr}}) {s}" for n, s in enumerate(result,1)]
             result = "\n".join(result)
