@@ -94,8 +94,8 @@ while True:
         if now()-start_cron >= parse_delay: 
             parse = False
             result = re.findall(regex, text)
-            # if not regtext: #con "" findall restituisce risultati vuoti
-            #     result = [s for s in result if s] #per ora consento
+            if not regtext: #con "" findall restituisce risultati vuoti
+                result = [s for s in result if s] #non consento
             lr = len(str(len(result)))
             result = [f"{n:0{lr}}) {s}" for n, s in enumerate(result,1)]
             result = "\n".join(result)
