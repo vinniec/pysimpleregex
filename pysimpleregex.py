@@ -27,6 +27,7 @@ def get_curr_screen_geometry(tk):
 
 sg.theme('BrightColors')  
 
+saved = []
 
 layout = [
     [
@@ -45,7 +46,11 @@ layout = [
     [sg.Multiline(key="text", size=(30,6), autoscroll=True,
                   enter_submits=True, do_not_clear=True,
     )],
-    [sg.Multiline(key="result", size=(30, 6), autoscroll=True, disabled=True)]
+    [sg.Multiline(key="result", size=(30, 6), autoscroll=True, disabled=True)],
+    [   sg.Button('save', key='save'),
+        sg.Button('load', key='load'),
+        sg.Combo(['new'] + saved, 'new', (19,1), key='savedlist'),
+    ],
 ]
 #enter_submits non funziona, almeno non in accoppiata con do_not_clear
 #multiline ha sempre un \n alla fine anche se è vuoto
