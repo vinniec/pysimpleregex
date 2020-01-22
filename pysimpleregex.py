@@ -493,7 +493,27 @@ class Record:
             raise ValueError
     def __str__(self):
         return self.record[self.key][0]
+    def __eq__(self, other):
+        """
+        vero se gli elementi sono uguali (le chiavi non sono importanti)
 
+        Parameters
+        ----------
+        other : Record
+            un altro record con cui fare il confronto
+        
+        Returns
+        -------
+        bool
+            se il contenuto dei record è lo stesso, senza la data
+        """
+        return all(a==b for a,b in zip(self.record.values(), other.record.values()))
+    @classmethod
+    def capture(cls, values):
+        regex = values['regbox'][:-1]
+        flags = ''.join([f for f in flags_cmb if values[f]])
+        text = values['text'][:-1]
+        return cls(regex, flags, text)
 
 std_regex = {"data" : ["regex", "flag", "testo"]}
 store = Appendsave(std_regex)
@@ -520,9 +540,10 @@ layout = [
     )],
     [sg.Multiline(key="result", size=(30, 6), autoscroll=True, disabled=True)],
     [   
-        sg.Button('save', key='save'),
-        sg.Button('load', key='load'),
-        sg.Combo(['new']+saved, 'new', (19,1), key='savedlist', readonly=True),
+        sg.Button('S', key='save', tooltip="save"),
+        sg.Button('L', key='load', tooltip="load"),
+        sg.Button('D', key='dele', tooltip="delete"),
+        sg.Combo(saved, size=(20,1), key='savedlist', readonly=True),
     ],
 ]
 #enter_submits non funziona, almeno non in accoppiata con do_not_clear
@@ -539,7 +560,7 @@ if sg.name == "PySimpleGUI":
 elif sg.name == "PySimpleGUIWeb":
     window = sg.Window("rg", layout, font=("Default", 20))
 #endregion
-
+#window['savedlist'].expand(True) #non funge, come espandere combo?
 
 parse = False
 parse_delay = 1
@@ -584,19 +605,25 @@ while True:
                 window['result'].update(result)
                 start_cron = now()
     elif event == "save":
-        svregex = values['regbox'][:-1]
-        svflags = ''.join([f for f in flags_cmb if values[f]])
-        sv_text = values['text'][:-1]
-        rec = Record(svregex, svflags, sv_text)
-        store.salva(rec.record)
+        recnew = Record.capture(values)
+        store.salva(recnew.record)
         saved = [Record(r) for r in store.elenca()]
-        window['savedlist'].update(rec, ['new']+saved)
+        window['savedlist'].update(recnew, saved)
     elif event == "load":
-        saves = values['savedlist']
-        window['regbox'].update(saves.regex)
-        for f in flags_cmb:
-            window[f].update(f in saves.flags)
-        window['text'].update(saves.text)
+        recsav = values['savedlist']
+        if isinstance(recsav, Record):
+            recact = Record.capture(values)
+            if recact != recsav: #devo overloaddare
+                window['regbox'].update(recsav.regex)
+                for f in flags_cmb:
+                    window[f].update(f in recsav.flags)
+                window['text'].update(recsav.text)
+            else:
+                sg.Popup("you load save with same content", font=("Default", 20))
+        else:
+            sg.Popup("you haven't select any save", font=("Default", 20))
+    elif event == "dele":
+        print(Record.capture(values))
 
 
 
@@ -639,6 +666,16 @@ window.close()
 #        "nuova",
 #        "I",
 #        "NUOVA"
+#    ],
+#    "20200122155751087828": [
+#        "prova salvataggio",
+#        "I",
+#        "prova salvataggio"
+#    ],
+#    "20200122161512289539": [
+#        "prova2",
+#        "M",
+#        "prova2"
 #    ]
 #}
 ### FINE ###
