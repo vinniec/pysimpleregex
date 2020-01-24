@@ -664,10 +664,11 @@ while True:
             popup("you haven't select any save")
     elif event == "dele":
         recsav = values['savedlist']
-        if isinstance(recsav, Record) and popup(f"delete?: {recsav}", True):
-            store.cancella(recsav.key)
-            saved = [Record(r) for r in store.elenca()]
-            window['savedlist'].update("", saved)
+        if isinstance(recsav, Record):
+            if popup(f"delete?: {recsav}", True):
+                store.cancella(recsav.key)
+                saved = [Record(r) for r in store.elenca()]
+                window['savedlist'].update("", saved)
         else:
             popup("No save selected")
 
@@ -697,5 +698,11 @@ window.close()
             # ~ print(n, dif)
             # ~ n += 1
 ### SAVE ###
-#{}
+#{
+#    "20200124153701865458": [
+#        "\\w+",
+#        "IM",
+#        "parole divisissime"
+#    ]
+#}
 ### FINE ###
