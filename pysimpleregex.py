@@ -10,7 +10,7 @@ import jsonpickle as json
 json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
 
-def get_curr_screen_geometry(tk):
+def screenpos(tk):
     """
     Workaround to get the size of the current screen in a multi-screen setup.
 
@@ -28,6 +28,7 @@ def get_curr_screen_geometry(tk):
     fullsize = int(x), int(y)
     
     return position, fullsize
+
 
 class Appendsave():
     """
@@ -260,14 +261,16 @@ class Appendsave():
     def aggiorna(self, chiave, elemento):
         validaz = self.valida(elemento) #mi assicuro che ci sia lo stesso struttura
         dati = self.importa_dati()
-        if all(isinstance(elemento, list) for op in (elemento, dati)):
+        if all(isinstance(op, list) for op in (elemento, dati)):
             if isinstance(chiave, int) and chiave<len(dati):
                 dati[chiave] = [elemento][0]
             else: raise TypeError(f"chiave {chiave} non idonea alla lista")
         elif all(isinstance(op, dict) for op in (elemento, dati)):
             if chiave in dati:
-                self.cancella(chiave)
-                dati.update(elemento)
+                chiave_el = next(iter(elemento))
+                dati[chiave] =  elemento[chiave_el]
+                # self.cancella(chiave)
+                # dati.update(elemento)
             else: raise TypeError(f"chiave {chiave} non presente nel dizionario")
         else: raise TypeError("sono supportati solo contenitori esterni tipo lista o dict")
         self.esporta_dati(dati)
@@ -466,6 +469,19 @@ class Record:
     classe di supporto per poter avere oggetti e non stringhe combo box
     di pysimplegui. Viene ritornato __str__ 
     """
+
+    @property
+    def record(self):
+        return {self.key : [self.regex, self.flags, self.text]}
+    @record.setter
+    def record(self, dati):
+        key = next(iter(dati.keys()))
+        dati = dati[key]
+        self.key = key
+        self.regex = dati[0]
+        self.flags = dati[1]
+        self.text =  dati[2]
+
     def __init__(self, *record):
         """
         Parameters
@@ -477,20 +493,14 @@ class Record:
         if len(record) == 1:
             record = record[0]
             self.record = record
-            key = next(iter(record.keys()))
-            self.key = key
-            self.regex = record[key][0]
-            self.flags = record[key][1]
-            self.text = record[key][2]
         elif len(record) == 3:
             key = store.timestamp()
             self.key = key
             self.regex = record[0]
             self.flags = record[1]
             self.text = record[2]
-            self.record = {key : [self.regex, self.flags, self.text]}
         else:
-            raise ValueError
+            raise ValueError("record inserted with wrong element number")
     def __str__(self):
         return self.record[self.key][0]
     def __eq__(self, other):
@@ -553,7 +563,7 @@ layout = [
 
 #region calcolo posizione finestra quando la creo 
 if sg.name == "PySimpleGUI":
-    sloc, ssiz = get_curr_screen_geometry(sg.tkinter) 
+    sloc, ssiz = screenpos(sg.tkinter) 
     offset = map(sum, zip(sloc, map(lambda n: n//4, ssiz)))
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))
@@ -606,14 +616,23 @@ while True:
                 start_cron = now()
     elif event == "save":
         recnew = Record.capture(values)
-        store.salva(recnew.record)
-        saved = [Record(r) for r in store.elenca()]
-        window['savedlist'].update(recnew, saved)
+        oksv = True
+        if any(recnew == Record(s) for s in store.elenca()):
+            oksv = sg.popup_yes_no("identical save already present, proced anyway?")      
+            oksv = True if oksv == "Yes" else False
+        if oksv:
+            recsav = values['savedlist']
+            if isinstance(recsav, Record) and sg.popup_yes_no("overwrite selected save?") == "Yes":
+                store.aggiorna(recsav.key, recnew.record)
+            else:
+                store.salva(recnew.record)
+            saved = [Record(r) for r in store.elenca()]
+            window['savedlist'].update(recnew, saved)
     elif event == "load":
         recsav = values['savedlist']
         if isinstance(recsav, Record):
             recact = Record.capture(values)
-            if recact != recsav: #devo overloaddare
+            if recact != recsav:
                 window['regbox'].update(recsav.regex)
                 for f in flags_cmb:
                     window[f].update(f in recsav.flags)
@@ -623,7 +642,11 @@ while True:
         else:
             sg.Popup("you haven't select any save", font=("Default", 20))
     elif event == "dele":
-        print(Record.capture(values))
+        recsav = values['savedlist']
+        if isinstance(recsav, Record) and sg.popup_yes_no(f"delete?: {recsav}") == "Yes":
+            store.cancella(recsav.key)
+            saved = [Record(r) for r in store.elenca()]
+            window['savedlist'].update("", saved)
 
 
 
@@ -651,31 +674,5 @@ window.close()
             # ~ print(n, dif)
             # ~ n += 1
 ### SAVE ###
-#{
-#    "20200122015859233094": [
-#        "\\w+",
-#        "",
-#        "prova di salvataggio"
-#    ],
-#    "20200122020529941340": [
-#        "\\w+",
-#        "IMSXA",
-#        "prova di salvataggio"
-#    ],
-#    "20200122020746085964": [
-#        "nuova",
-#        "I",
-#        "NUOVA"
-#    ],
-#    "20200122155751087828": [
-#        "prova salvataggio",
-#        "I",
-#        "prova salvataggio"
-#    ],
-#    "20200122161512289539": [
-#        "prova2",
-#        "M",
-#        "prova2"
-#    ]
-#}
+#{}
 ### FINE ###
