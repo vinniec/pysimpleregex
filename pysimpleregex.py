@@ -29,7 +29,6 @@ def screenpos(tk):
     
     return position, fullsize
 
-
 class Appendsave():
     """
     Questa classe salva i cambiamenti in fondo al file in una
@@ -525,12 +524,11 @@ class Record:
         text = values['text'][:-1]
         return cls(regex, flags, text)
 
+sg.theme('BrightColors')
+dfont = ("Default", 20)
 std_regex = {"data" : ["regex", "flag", "testo"]}
 store = Appendsave(std_regex)
-# store.salva(std_regex)
 saved = [Record(r) for r in store.elenca()]
-
-sg.theme('BrightColors')
 layout = [
     [   
         sg.Checkbox("I", key="I", tooltip="IGNORECASE"),
@@ -568,9 +566,35 @@ if sg.name == "PySimpleGUI":
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))
 elif sg.name == "PySimpleGUIWeb":
-    window = sg.Window("rg", layout, font=("Default", 20))
+    window = sg.Window("rg", layout, font=dfont)
 #endregion
 #window['savedlist'].expand(True) #non funge, come espandere combo?
+
+def popup(mex, y_n=False, font=dfont, pos=window):
+    """
+    shorcut to preconfigured popup format
+    
+    Parameters
+    ----------
+    mex : string
+        message to show
+    y_n : bool, optional
+        if popup have yes-no buttons, by default False
+    font : tuple, optional
+        font format of pysimplegui, by default dfont
+    pos : (int,int), optional
+        upper-left position of the popup, by default window.current_location()
+    
+    Returns
+    -------
+    bool
+        True of False
+    """
+    if not isinstance(pos, tuple):
+        pos = pos.current_location() 
+    poop = sg.popup_yes_no if y_n else sg.popup
+    res = poop(mex, font=font, location=pos)
+    return True if res == "Yes" else False
 
 parse = False
 parse_delay = 1
@@ -583,8 +607,6 @@ while True:
     #dovrebbe togliere il focus quando si switcha con tab, ma...
     if sg.name == "PySimpleGUI":
         window['result'].Widget.config(takefocus=0)
-
-    # print(event)
 
     if event is None:   #se premo su esc, escio
         break 
@@ -618,11 +640,10 @@ while True:
         recnew = Record.capture(values)
         oksv = True
         if any(recnew == Record(s) for s in store.elenca()):
-            oksv = sg.popup_yes_no("identical save already present, proced anyway?")      
-            oksv = True if oksv == "Yes" else False
+            oksv = popup("identical save already present, proced anyway?", True)      
         if oksv:
             recsav = values['savedlist']
-            if isinstance(recsav, Record) and sg.popup_yes_no("overwrite selected save?") == "Yes":
+            if isinstance(recsav, Record) and popup("overwrite selected save?", True):
                 store.aggiorna(recsav.key, recnew.record)
             else:
                 store.salva(recnew.record)
@@ -638,15 +659,17 @@ while True:
                     window[f].update(f in recsav.flags)
                 window['text'].update(recsav.text)
             else:
-                sg.Popup("you load save with same content", font=("Default", 20))
+                popup("you load save with same content")
         else:
-            sg.Popup("you haven't select any save", font=("Default", 20))
+            popup("you haven't select any save")
     elif event == "dele":
         recsav = values['savedlist']
-        if isinstance(recsav, Record) and sg.popup_yes_no(f"delete?: {recsav}") == "Yes":
+        if isinstance(recsav, Record) and popup(f"delete?: {recsav}", True):
             store.cancella(recsav.key)
             saved = [Record(r) for r in store.elenca()]
             window['savedlist'].update("", saved)
+        else:
+            popup("No save selected")
 
 
 
