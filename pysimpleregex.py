@@ -698,11 +698,5 @@ window.close()
             # ~ print(n, dif)
             # ~ n += 1
 ### SAVE ###
-#{
-#    "20200124153701865458": [
-#        "\\w+",
-#        "IM",
-#        "parole divisissime"
-#    ]
-#}
+#{}
 ### FINE ###
