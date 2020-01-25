@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #region import 
-# ~ import PySimpleGUIWeb as sg
+#import PySimpleGUIWeb as sg
 import PySimpleGUI as sg
 import re 
 from time import monotonic as now 
@@ -124,7 +124,7 @@ class Appendsave():
             righe.append(self.mkb)
             j_fine = len(righe)
         return j_iniz, j_fine
-    def scrivi_dati(self, testo, proteggi_script=False, diff_dati=True):
+    def scrivi_dati(self, testo, proteggi_script=True, diff_dati=True):
         """
         scrive i dati, ma solo se ci sono cambiamenti
         
