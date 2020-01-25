@@ -10,23 +10,27 @@ import jsonpickle as json
 json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
 
-def screenpos(tk):
+def possize(tk):
     """
     Workaround to get the size of the current screen in a multi-screen setup.
 
     Returns:
         position, fullsize (int): Two tuple of int,int dimension
     """
-    root = tk.Tk()
-    root.update_idletasks()
-    root.attributes('-fullscreen', True)
-    root.state('iconic')
-    geometry = root.winfo_geometry()
-    root.destroy()
-    x,y,xp,yp = geometry.translate("".maketrans("x+", "  ")).split()
-    position = int(xp), int(yp)
-    fullsize = int(x), int(y)
-    
+    if type(tk).__name__ == "Window":
+        print(tk, "merda")
+        position = tk.current_location()
+        fullsize = tk.size
+    else:
+        root = tk.Tk()
+        root.update_idletasks()
+        root.attributes('-fullscreen', True)
+        root.state('iconic')
+        geometry = root.winfo_geometry()
+        root.destroy()
+        x,y,xp,yp = geometry.translate("".maketrans("x+", "  ")).split()
+        position = int(xp), int(yp)
+        fullsize = int(x), int(y)
     return position, fullsize
 
 class Appendsave():
@@ -525,33 +529,38 @@ class Record:
         return cls(regex, flags, text)
 
 sg.theme('BrightColors')
-dfont = ("Default", 20)
+dfont = ("Monospace", 20)                 #def font
+sfont = (dfont[0], int(dfont[1]/10*9))  #font checkbox
+ch_flen = 30                            #full len in char of box
+ch_slen = int(ch_flen/3*2)              #len in char of combobox 2/3
+ch_fwid = 17                            #tot width char, hardcoded magicnumber
 std_regex = {"data" : ["regex", "flag", "testo"]}
 store = Appendsave(std_regex)
 saved = [Record(r) for r in store.elenca()]
 layout = [
     [   
-        sg.Checkbox("I", key="I", tooltip="IGNORECASE"),
-        sg.Checkbox("L", key="L", tooltip="LOCALE (only with byte pattern)", disabled=True),
-        sg.Checkbox("M", key="M", tooltip="MULTILINE"),
-        sg.Checkbox("S", key="S", tooltip="DOTALL"),
-        sg.Checkbox("U", key="U", tooltip="UNICODE (default if not ascii)", disabled=True),
-        sg.Checkbox("X", key="X", tooltip="VERBOSE"),
-        sg.Checkbox("A", key="A", tooltip="ASCII"),
+        sg.Button('?', key='help', tooltip="help"),
+        sg.Checkbox("I", key="I", font=sfont, tooltip="IGNORECASE"),
+        sg.Checkbox("L", key="L", font=sfont, tooltip="LOCALE (only with byte pattern)", disabled=True),
+        sg.Checkbox("M", key="M", font=sfont, tooltip="MULTILINE"),
+        sg.Checkbox("S", key="S", font=sfont, tooltip="DOTALL"),
+        sg.Checkbox("U", key="U", font=sfont, tooltip="UNICODE (default if not ascii)", disabled=True),
+        sg.Checkbox("X", key="X", font=sfont, tooltip="VERBOSE"),
+        sg.Checkbox("A", key="A", font=sfont, tooltip="ASCII"),
     ],
-    [sg.Multiline(key="regbox", size=(30,3), autoscroll=True,
+    [sg.Multiline(key="regbox", size=(ch_flen,3), autoscroll=True,
                   focus=True, # ~ enable_events=True, 
                   enter_submits=True, do_not_clear=True,
     )],
-    [sg.Multiline(key="text", size=(30,6), autoscroll=True,
+    [sg.Multiline(key="text", size=(ch_flen,6), autoscroll=True,
                   enter_submits=True, do_not_clear=True,
     )],
-    [sg.Multiline(key="result", size=(30, 6), autoscroll=True, disabled=True)],
+    [sg.Multiline(key="result", size=(ch_flen, 6), autoscroll=True, disabled=True)],
     [   
         sg.Button('S', key='save', tooltip="save"),
         sg.Button('L', key='load', tooltip="load"),
         sg.Button('D', key='dele', tooltip="delete"),
-        sg.Combo(saved, size=(20,1), key='savedlist', readonly=True),
+        sg.Combo(saved, size=(ch_slen,1), key='savedlist', readonly=True),
     ],
 ]
 #enter_submits non funziona, almeno non in accoppiata con do_not_clear
@@ -561,7 +570,7 @@ layout = [
 
 #region calcolo posizione finestra quando la creo 
 if sg.name == "PySimpleGUI":
-    sloc, ssiz = screenpos(sg.tkinter) 
+    sloc, ssiz = possize(sg.tkinter) 
     offset = map(sum, zip(sloc, map(lambda n: n//4, ssiz)))
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))
@@ -570,7 +579,7 @@ elif sg.name == "PySimpleGUIWeb":
 #endregion
 #window['savedlist'].expand(True) #non funge, come espandere combo?
 
-def popup(mex, y_n=False, font=dfont, pos=window):
+def popup(mex, y_n=False, scr=False, font=dfont, pos=window, siz=(ch_flen+1,ch_fwid)):
     """
     shorcut to preconfigured popup format
     
@@ -580,22 +589,31 @@ def popup(mex, y_n=False, font=dfont, pos=window):
         message to show
     y_n : bool, optional
         if popup have yes-no buttons, by default False
+    scr : bool, optional
+        if popup is scrollable (disable y_n), by default False
     font : tuple, optional
         font format of pysimplegui, by default dfont
     pos : (int,int), optional
-        upper-left position of the popup, by default window.current_location()
-    
+        upper-left position of the popup, can be windows object and
+        reflect topleft of window, or PySimpleGUI module and reflect
+        topleft of desktop, by default window
+    size : (int,int), optional
+        dimension of popup in character, valid only for scrollable popup,
+        by default hardcoded to window dimension 
     Returns
     -------
     bool
         True of False
     """
     if not isinstance(pos, tuple):
-        pos = pos.current_location() 
-    poop = sg.popup_yes_no if y_n else sg.popup
-    res = poop(mex, font=font, location=pos)
+        # pos = pos.current_location() 
+        pos, _size = possize(pos)
+    if scr:
+        res = sg.popup_scrolled(mex, font=font, location=pos, size=siz)
+    else:
+        poop = sg.popup_yes_no if y_n else sg.popup
+        res = poop(mex, font=font, location=pos)
     return True if res == "Yes" else False
-
 parse = False
 parse_delay = 1
 start_cron = now()
@@ -632,10 +650,58 @@ while True:
                 if not regtext: #con "" findall restituisce risultati vuoti
                     result = [s for s in result if s] #non consento
                 lr = len(str(len(result)))
+                print(result)
                 result = [f"{n:0{lr}}) {s}" for n, s in enumerate(result,1)]
                 result = "\n".join(result)
                 window['result'].update(result)
                 start_cron = now()
+    elif event == "help":
+        mex =   r"Special Character (_ for cont)" + "\n" \
+                r".   all except newline(dotall)" + "\n" \
+                r"^   start of the string" + "\n" \
+                r"$   end of the string" + "\n" \
+                r"*   0 or more greedy (*? notg)" + "\n" \
+                r"+   1 or more greedy (+? notg)" + "\n" \
+                r"?   0 or 1    greedy (?? notg)" + "\n" \
+                r"{,} opt from,to ({,}? notgree)" + "\n" \
+                r"\   escape special seq or char" + "\n" \
+                r"[_]  set of char ([^] complem)" + "\n" \
+                r"|   alternative" + "\n" \
+                r"(_)  grouping match \id access" + "\n" \
+                r"(?_)inline flag, _ for iLmsuxa" + "\n" \
+                r"(?:_)nogroup match, no accessb  " + "\n" \
+                r"(?P<name>_)groupmtch \name acc" + "\n" \
+                r"(?P=name_)match previous again" + "\n" \
+                r"(?#_) ignored comment" + "\n" \
+                r"(?=_)if next is _ noconsum str" + "\n" \
+                r"(?!_)if next is not _" + "\n" \
+                r"(?<=_)if preceded by _ fix len" + "\n" \
+                r"(?<!_)if not prec by _ fix len" + "\n" \
+                r"(?(id/name)yes|no)alternative?" + "\n" \
+                r"" + "\n" \
+                r"Special Sequence (escp with \)" + "\n" \
+                r"\n  number, matches grou again" + "\n" \
+                r"\A  match only at start of str" + "\n" \
+                r"\Z  match only at end of strin" + "\n" \
+                r"\b  m. empty strn outside word" + "\n" \
+                r"\B  m. emptu strng inside word" + "\n" \
+                r"\d  all digits, in ascii [0-9]" + "\n" \
+                r"\D  all non digits equiv [^\d]" + "\n" \
+                r"\s  allspace,asci[ \t\n\r\f\v]" + "\n" \
+                r"\S  all non wspace equiv [^\S]" + "\n" \
+                r"\w  all alphanum,a[a-zA-Z0-9_]" + "\n" \
+                r"\W  \w complement, equiv [^\w]" + "\n" \
+                r"\\  literal backslash" + "\n" \
+                r"    " + "\n" \
+                r"Flag Description (- disabled)" + "\n" \
+                r"I   ignore case sensitive" + "\n" \
+                r"L - \w\W\b\B locale dependent" + "\n" \
+                r"M   ^ $ matched every newline" + "\n" \
+                r"S   . match any char also \n" + "\n" \
+                r"U - unicode, default no ascii " + "\n" \
+                r"X   ignore wspace and comment" + "\n" \
+                r"A   \w\W\b\B\d\D ascii setted"
+        popup(mex, scr=True)
     elif event == "save":
         recnew = Record.capture(values)
         oksv = True
