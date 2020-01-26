@@ -124,6 +124,20 @@ class Appendsave():
             righe.append(self.mkb)
             j_fine = len(righe)
         return j_iniz, j_fine
+    def add_own_exec(self, file):
+        """
+        aggiunge i permessi di esecuzione al file per l'utente
+        
+        Parameters
+        ----------
+        file : path
+            stringa o Path del file
+        """
+        file = pathlib.Path(file)
+        p_oc = oct(file.stat().st_mode)
+        pref, perm = p_oc[:-3], p_oc[-3:]
+        perm = str(int(perm[0]) | 1) + perm[1:]
+        file.chmod(int(pref+perm,8))    
     def scrivi_dati(self, testo, proteggi_script=True, diff_dati=True):
         """
         scrive i dati, ma solo se ci sono cambiamenti
@@ -161,6 +175,7 @@ class Appendsave():
             self.tmp_script.write_text(testo)
             self.old_script.rename(self.bkp_script)
             self.tmp_script.rename(self.old_script)
+            self.add_own_exec(self.old_script)
         else:
             er = f"Scrittura non effettuata: "\
                  f"{'nessun cambiamento' if not p_dif else ''}"\
