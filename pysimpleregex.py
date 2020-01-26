@@ -18,7 +18,6 @@ def possize(tk):
         position, fullsize (int): Two tuple of int,int dimension
     """
     if type(tk).__name__ == "Window":
-        print(tk, "merda")
         position = tk.current_location()
         fullsize = tk.size
     else:
@@ -61,8 +60,8 @@ class Appendsave():
         """
         
         old_script = pathlib.Path(__file__).resolve()
-        tmp_script = old_script.parent / (old_script.stem + "_tmp" + old_script.suffix)
-        bkp_script = old_script.parent / (old_script.stem + "_bkp" + old_script.suffix)
+        tmp_script = old_script.parent / (old_script.stem + old_script.suffix + "_tmp")
+        bkp_script = old_script.parent / (old_script.stem + old_script.suffix + "_bkp")
 
         self.standard = standard
         list(self.discendi(standard))   #produco lo schema di default con cui
@@ -665,7 +664,6 @@ while True:
                 if not regtext: #con "" findall restituisce risultati vuoti
                     result = [s for s in result if s] #non consento
                 lr = len(str(len(result)))
-                print(result)
                 result = [f"{n:0{lr}}) {s}" for n, s in enumerate(result,1)]
                 result = "\n".join(result)
                 window['result'].update(result)
