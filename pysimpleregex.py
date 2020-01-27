@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 #region import 
-#import PySimpleGUIWeb as sg
-import PySimpleGUI as sg
-import re 
-from time import monotonic as now 
-import pathlib
-from datetime import datetime
+import re, pathlib
+import PySimpleGUI as sg    #import PySimpleGUIWeb as sg
 import jsonpickle as json
+from datetime import datetime
+from time import monotonic as now 
 json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
 
@@ -32,7 +30,7 @@ def possize(tk):
         fullsize = int(x), int(y)
     return position, fullsize
 
-class Appendsave():
+class Appendsave:
     """
     Questa classe salva i cambiamenti in fondo al file in una
     struttura dati delimitata da due marcatori
@@ -43,7 +41,7 @@ class Appendsave():
     SCALAR = tuple(SCALAR)
     ITERAB = tuple(ITERAB)
 
-    def __init__(self, standard=[], mka='### SAVE ###', mkb='### FINE ###', dateform="%Y%m%d%H%M%S%f"):
+    def __init__(self, standard=None, mka='### SAVE ###', mkb='### FINE ###', dateform="%Y%m%d%H%M%S%f"):
         """
         init
         
@@ -60,9 +58,10 @@ class Appendsave():
         """
         
         old_script = pathlib.Path(__file__).resolve()
-        tmp_script = old_script.parent / (old_script.stem + old_script.suffix + "_tmp")
-        bkp_script = old_script.parent / (old_script.stem + old_script.suffix + "_bkp")
+        tmp_script = old_script.parent / (old_script.name + "_tmp")
+        bkp_script = old_script.parent / (old_script.name + "_bkp")
 
+        if standard is None: standard = []
         self.standard = standard
         list(self.discendi(standard))   #produco lo schema di default con cui
         self.schema = self._schema_last  #andrò a validare gli inserimenti
@@ -623,7 +622,7 @@ def popup(mex, y_n=False, scr=False, font=dfont, pos=window, siz=(ch_flen+1,ch_f
         # pos = pos.current_location() 
         pos, _size = possize(pos)
     if scr:
-        res = sg.popup_scrolled(mex, font=font, location=pos, size=siz)
+        res = sg.popup_scrolled(mex, font=font, location=pos, size=siz, non_blocking=True)
     else:
         poop = sg.popup_yes_no if y_n else sg.popup
         res = poop(mex, font=font, location=pos)
