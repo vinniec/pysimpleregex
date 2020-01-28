@@ -750,31 +750,8 @@ while True:
         else:
             popup("No save selected")
 
-
-
-
-
-
-
 window.close()
-        
-        
-        
-        
-        
-    #DELAY EVENTI
-    # ~ if event is None:
-        # ~ break
-    # ~ elif event == "reg":
-        # ~ now = ns()
-        # ~ dif = int((now-back)/1E9)
-        # ~ if dif >= 5:
-            # ~ print('e', dif)
-            # ~ back = now
-            # ~ n = 1            
-        # ~ elif dif >= n:
-            # ~ print(n, dif)
-            # ~ n += 1
+
 ### SAVE ###
 #{}
 ### FINE ###
