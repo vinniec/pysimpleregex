@@ -602,40 +602,40 @@ class Record:
 
 
 sg.theme('BrightColors')
-dfont = ("Monospace", 20)                 #def font
-sfont = (dfont[0], int(dfont[1]/10*9))  #font checkbox
-ch_flen = 30                            #full len in char of box
-# ch_slen = int(ch_flen/3*2)              #len in char of combobox 2/3
-ch_slen = 17
-ch_fwid = 17                            #tot width char, hardcoded magicnumber
-std_regex = {"data" : ["regex", "flag", "testo"]}
-store = Appendsave(std_regex)
+DFONT = ("Monospace", 20)               #def font
+SFONT = (DFONT[0], int(DFONT[1]/10*9))  #font checkbox
+CH_FLEN = 30                            #full len in char of box
+# CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
+CH_SLEN = 17
+CH_FWID = 17                            #tot width char, hardcoded magicnumber
+STD_REGEX = {"data" : ["regex", "flag", "testo"]}
+store = Appendsave(STD_REGEX)
 saved = [Record(r) for r in store.elenca()]
 layout = [
     [   
         sg.Button('?', key='help', tooltip="help"),
-        sg.Checkbox("I", key="I", font=sfont, tooltip="IGNORECASE"),
-        sg.Checkbox("L", key="L", font=sfont, tooltip="LOCALE (only with byte pattern)", disabled=True),
-        sg.Checkbox("M", key="M", font=sfont, tooltip="MULTILINE"),
-        sg.Checkbox("S", key="S", font=sfont, tooltip="DOTALL"),
-        sg.Checkbox("U", key="U", font=sfont, tooltip="UNICODE (default if not ascii)", disabled=True),
-        sg.Checkbox("X", key="X", font=sfont, tooltip="VERBOSE"),
-        sg.Checkbox("A", key="A", font=sfont, tooltip="ASCII"),
+        sg.Checkbox("I", key="I", font=SFONT, tooltip="IGNORECASE"),
+        sg.Checkbox("L", key="L", font=SFONT, tooltip="LOCALE (only with byte pattern)", disabled=True),
+        sg.Checkbox("M", key="M", font=SFONT, tooltip="MULTILINE"),
+        sg.Checkbox("S", key="S", font=SFONT, tooltip="DOTALL"),
+        sg.Checkbox("U", key="U", font=SFONT, tooltip="UNICODE (default if not ascii)", disabled=True),
+        sg.Checkbox("X", key="X", font=SFONT, tooltip="VERBOSE"),
+        sg.Checkbox("A", key="A", font=SFONT, tooltip="ASCII"),
     ],
-    [sg.Multiline(key="regbox", size=(ch_flen,3), autoscroll=True,
+    [sg.Multiline(key="regbox", size=(CH_FLEN,3), autoscroll=True,
                   focus=True, # ~ enable_events=True, 
                   enter_submits=True, do_not_clear=True,
     )],
-    [sg.Multiline(key="text", size=(ch_flen,6), autoscroll=True,
+    [sg.Multiline(key="text", size=(CH_FLEN,6), autoscroll=True,
                   enter_submits=True, do_not_clear=True,
     )],
-    [sg.Multiline(key="result", size=(ch_flen, 6), autoscroll=True, disabled=True)],
+    [sg.Multiline(key="result", size=(CH_FLEN, 6), autoscroll=True, disabled=True)],
     [   
         sg.Button('N', key='new', tooltip="new"),
         sg.Button('S', key='save', tooltip="save"),
         sg.Button('L', key='load', tooltip="load"),
         sg.Button('D', key='dele', tooltip="delete"),
-        sg.Combo(saved, size=(ch_slen,1), key='savedlist', readonly=True),
+        sg.Combo(saved, size=(CH_SLEN,1), key='savedlist', readonly=True),
     ],
 ]
 #enter_submits non funziona, almeno non in accoppiata con do_not_clear
@@ -645,16 +645,16 @@ layout = [
 
 #region calcolo posizione finestra quando la creo 
 if sg.name == "PySimpleGUI":
-    sloc, ssiz, sdec = preset_dim(sg) 
-    offset = map(sum, zip(sloc, map(lambda n: n//4, ssiz)))
+    SLOC, SSIZ, SDEC = preset_dim(sg) 
+    offset = map(sum, zip(SLOC, map(lambda n: n//4, SSIZ)))
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))
 elif sg.name == "PySimpleGUIWeb":
-    window = sg.Window("rg", layout, font=dfont)
+    window = sg.Window("rg", layout, font=DFONT)
 #endregion
 #window['savedlist'].expand(True) #non funge, come espandere combo?
 
-def popup(mex, y_n=False, scr=False, font=dfont, pos=window, siz=(ch_flen+1,ch_fwid)):
+def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_FWID)):
     """
     shorcut to preconfigured popup format
     
@@ -667,7 +667,7 @@ def popup(mex, y_n=False, scr=False, font=dfont, pos=window, siz=(ch_flen+1,ch_f
     scr : bool, optional
         if popup is scrollable (disable y_n), by default False
     font : tuple, optional
-        font format of pysimplegui, by default dfont
+        font format of pysimplegui, by default DFONT
     pos : (int,int), optional
         upper-left position of the popup, can be windows object and
         reflect topleft of window, or PySimpleGUI module and reflect
@@ -681,18 +681,18 @@ def popup(mex, y_n=False, scr=False, font=dfont, pos=window, siz=(ch_flen+1,ch_f
         True of False
     """
     if not isinstance(pos, tuple):
-        pos = tuple(a-b for a,b in zip(pos.current_location(),sdec)) 
+        pos = tuple(a-b for a,b in zip(pos.current_location(), SDEC)) 
     if scr:
         res = sg.popup_scrolled(mex, font=font, location=pos, size=siz, non_blocking=True, keep_on_top=True)
     else:
         poop = sg.popup_yes_no if y_n else sg.popup
         res = poop(mex, font=font, location=pos, keep_on_top=True)
     return True if res == "Yes" else False
-parse = False
-parse_delay = 1
-start_cron = now()
-regex = regtext = text = flags_old = ""
+PARSE_DELAY = 1
 FLAGS_CMB  = "ILMSUXA"
+parse = False
+regex = regtext = text = flags_old = ""
+start_cron = now()
 while True:
     #ogni secondo rilascio uno stato
     event, values = window.read(timeout=1000)  #un controllo al sec
@@ -718,7 +718,7 @@ while True:
             parse = True
             start_cron = now()
         if parse:
-            if now()-start_cron >= parse_delay: 
+            if now()-start_cron >= PARSE_DELAY: 
                 parse = False
                 result = re.findall(regex, text)
                 if not regtext: #con "" findall restituisce risultati vuoti
