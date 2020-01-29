@@ -523,14 +523,21 @@ class Record:
         if len(record) == 1:
             record = record[0]
             self.record = record
-        elif len(record) == 3:
-            key = store.timestamp()
-            self.key = key
-            self.regex = record[0]
-            self.flags = record[1]
-            self.text = record[2]
         else:
-            raise ValueError("record inserted with wrong element number")
+            att = ['key', 'regex', 'flags', 'text']
+            rec = [store.timestamp()] + list(record) + [""]*(len(att)-1-len(record))
+            for a,v in zip(att, rec):
+                self.__setattr__(a,v)
+        # elif len(record) == 3:
+        #     key = store.timestamp()
+        #     self.key = key
+        #     self.regex = record[0]
+        #     self.flags = record[1]
+        #     self.text = record[2]
+        # else:
+        #     self.key = store.timestamp()
+        #     self.regex = self.flags = self.text = ''
+            # raise ValueError("record inserted with wrong element number")
     def __str__(self):
         return self.record[self.key][0]
     def __eq__(self, other):
@@ -548,18 +555,58 @@ class Record:
             se il contenuto dei record è lo stesso, senza la data
         """
         return all(a==b for a,b in zip(self.record.values(), other.record.values()))
+    def is_empty(self):
+        """return True if the record is void"""
+        return not any((self.regex, self.flags, self.text))
+    def is_saved(self):
+        """return True if record is already saved"""
+        return any(self == Record(s) for s in store.elenca())
     @classmethod
     def capture(cls, values):
         regex = values['regbox'][:-1]
-        flags = ''.join([f for f in flags_cmb if values[f]])
+        flags = ''.join([f for f in FLAGS_CMB  if values[f]])
         text = values['text'][:-1]
         return cls(regex, flags, text)
+    @classmethod
+    def show(cls, window, *record):
+        if len(record) == 1 and isinstance(record[0], Record):
+            record = record[0]
+        else:
+            record = Record(*record)
+        window['regbox'].update(record)
+        for f in FLAGS_CMB :
+            window[f].update(f in record.flags)
+        window['text'].update(record)
+    @classmethod
+    def updatelist(cls, window, record=None):
+        """
+        update the list of record on the interface,
+        if record is a saved record, preselect it in the list
+        
+        Parameters
+        ----------
+        window : sg.Window
+            the instnced windows of pysimplegui
+        record : Record, optional
+            one save, by default None
+        
+        Returns
+        -------
+        [Record, Record...]
+            updated list of saved record
+        """
+        if record is None or not record.is_saved(): record = Record()
+        saved = [Record(r) for r in store.elenca()]
+        window['savedlist'].update(record, saved)
+        return saved
+
 
 sg.theme('BrightColors')
 dfont = ("Monospace", 20)                 #def font
 sfont = (dfont[0], int(dfont[1]/10*9))  #font checkbox
 ch_flen = 30                            #full len in char of box
-ch_slen = int(ch_flen/3*2)              #len in char of combobox 2/3
+# ch_slen = int(ch_flen/3*2)              #len in char of combobox 2/3
+ch_slen = 17
 ch_fwid = 17                            #tot width char, hardcoded magicnumber
 std_regex = {"data" : ["regex", "flag", "testo"]}
 store = Appendsave(std_regex)
@@ -584,6 +631,7 @@ layout = [
     )],
     [sg.Multiline(key="result", size=(ch_flen, 6), autoscroll=True, disabled=True)],
     [   
+        sg.Button('N', key='new', tooltip="new"),
         sg.Button('S', key='save', tooltip="save"),
         sg.Button('L', key='load', tooltip="load"),
         sg.Button('D', key='dele', tooltip="delete"),
@@ -644,7 +692,7 @@ parse = False
 parse_delay = 1
 start_cron = now()
 regex = regtext = text = flags_old = ""
-flags_cmb = "ILMSUXA"
+FLAGS_CMB  = "ILMSUXA"
 while True:
     #ogni secondo rilascio uno stato
     event, values = window.read(timeout=1000)  #un controllo al sec
@@ -656,7 +704,7 @@ while True:
         break 
     elif event == "__TIMEOUT__": #nel caso l'evento sia la cadenza di aggiorn
         #se la regex è cambiata l'aggiorno, [:-1] tolgo l'\n alla fine
-        flags_new = [f for f in flags_cmb if values[f]]
+        flags_new = [f for f in FLAGS_CMB  if values[f]]
         if (flags_old != flags_new) or (regtext != values['regbox'][:-1]):
             flags_old = flags_new
             flags_sum = sum([eval("re."+f) for f in flags_old])
@@ -727,28 +775,39 @@ while True:
                 r"X   ignore wspace and comment" + "\n" \
                 r"A   \w\W\b\B\d\D ascii setted"
         popup(mex, scr=True)
-    elif event == "save":
+    elif event == "new":
         recnew = Record.capture(values)
         oksv = True
-        if any(recnew == Record(s) for s in store.elenca()):
-            oksv = popup("identical save already present, proced anyway?", True)      
+        if not recnew.is_empty():
+            if not recnew.is_saved():
+                oksv = popup("The current work is not saved, procede anyway?", True)
         if oksv:
-            recsav = values['savedlist']
-            if isinstance(recsav, Record) and popup("overwrite selected save?", True):
-                store.aggiorna(recsav.key, recnew.record)
-            else:
-                store.salva(recnew.record)
-            saved = [Record(r) for r in store.elenca()]
-            window['savedlist'].update(recnew, saved)
+            Record.show(window)
+            Record.updatelist(window)
+    elif event == "save":
+        recnew = Record.capture(values)
+        if not recnew.is_empty():
+            oksv = True
+            if recnew.is_saved():
+                oksv = popup("identical save already present, proced anyway?", True)      
+            if oksv:
+                recsav = values['savedlist']
+                if isinstance(recsav, Record) and popup("overwrite selected save?", True):
+                    store.aggiorna(recsav.key, recnew.record)
+                else:
+                    store.salva(recnew.record)
+                Record.updatelist(window, recnew)
+        else:
+            popup("the record is empty!")
     elif event == "load":
         recsav = values['savedlist']
         if isinstance(recsav, Record):
-            recact = Record.capture(values)
-            if recact != recsav:
-                window['regbox'].update(recsav.regex)
-                for f in flags_cmb:
-                    window[f].update(f in recsav.flags)
-                window['text'].update(recsav.text)
+            recnew = Record.capture(values)
+            if recnew != recsav:
+                oksv = True
+                if not recnew.is_saved():
+                    oksv = popup("The current work is not saved, procede anyway?", True)
+                if oksv: Record.show(window, recsav)
             else:
                 popup("you load save with same content")
         else:
@@ -758,13 +817,28 @@ while True:
         if isinstance(recsav, Record):
             if popup(f"delete?: {recsav}", True):
                 store.cancella(recsav.key)
-                saved = [Record(r) for r in store.elenca()]
-                window['savedlist'].update("", saved)
+                Record.updatelist(window)
         else:
             popup("No save selected")
 
 window.close()
 
 ### SAVE ###
-#{}
+#{
+#    "20200129125124360072": [
+#        "prova",
+#        "SA",
+#        "prova"
+#    ],
+#    "20200129142532727748": [
+#        "prova2",
+#        "SA",
+#        "prova2"
+#    ],
+#    "20200129145430965394": [
+#        "oizx",
+#        "",
+#        ""
+#    ]
+#}
 ### FINE ###
