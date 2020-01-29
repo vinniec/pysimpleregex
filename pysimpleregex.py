@@ -8,27 +8,41 @@ from time import monotonic as now
 json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
 
-def possize(tk):
+def preset_dim(sg):
     """
-    Workaround to get the size of the current screen in a multi-screen setup.
-
-    Returns:
-        position, fullsize (int): Two tuple of int,int dimension
+    return, position, size and offset caused by decorator
+    
+    Parameters
+    ----------
+    sg : PySimpeGUI module
+        imported module of pysimplegui
+    
+    Returns
+    -------
+    ((int,int),(int,int),(int,int))
+        start position of the screen, dimension and decorator shift
     """
-    if type(tk).__name__ == "Window":
-        position = tk.current_location()
-        fullsize = tk.size
-    else:
-        root = tk.Tk()
-        root.update_idletasks()
-        root.attributes('-fullscreen', True)
-        root.state('iconic')
-        geometry = root.winfo_geometry()
-        root.destroy()
-        x,y,xp,yp = geometry.translate("".maketrans("x+", "  ")).split()
-        position = int(xp), int(yp)
-        fullsize = int(x), int(y)
-    return position, fullsize
+     
+    win = sg.Window('mlw', [[]], alpha_channel=0)
+    win.read(timeout=0)
+    lc1 = win.current_location()
+    win.close(); del win
+    win = sg.Window('mlw', [[]], location=lc1, alpha_channel=0)
+    win.read(timeout=0)
+    lc2 = win.current_location()
+    geometry = neogeo = win.TKroot.winfo_geometry()
+    win.maximize()
+    xd, yd = lc2[0]-lc1[0], lc2[1]-lc1[1]
+    decorator = xd, yd
+    while geometry == neogeo:
+        win.refresh()
+        neogeo = win.TKroot.winfo_geometry()
+    geometry = neogeo
+    win.close(); del win
+    x,y,xp,yp = geometry.translate("".maketrans("x+", "  ")).split()
+    position = int(xp), int(yp)
+    fullsize = int(x), int(y)
+    return position, fullsize, decorator
 
 class Appendsave:
     """
@@ -583,7 +597,7 @@ layout = [
 
 #region calcolo posizione finestra quando la creo 
 if sg.name == "PySimpleGUI":
-    sloc, ssiz = possize(sg.tkinter) 
+    sloc, ssiz, sdec = preset_dim(sg) 
     offset = map(sum, zip(sloc, map(lambda n: n//4, ssiz)))
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))
@@ -619,8 +633,7 @@ def popup(mex, y_n=False, scr=False, font=dfont, pos=window, siz=(ch_flen+1,ch_f
         True of False
     """
     if not isinstance(pos, tuple):
-        # pos = pos.current_location() 
-        pos, _size = possize(pos)
+        pos = tuple(a-b for a,b in zip(pos.current_location(),sdec)) 
     if scr:
         res = sg.popup_scrolled(mex, font=font, location=pos, size=siz, non_blocking=True)
     else:
