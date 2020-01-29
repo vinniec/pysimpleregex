@@ -683,10 +683,10 @@ def popup(mex, y_n=False, scr=False, font=dfont, pos=window, siz=(ch_flen+1,ch_f
     if not isinstance(pos, tuple):
         pos = tuple(a-b for a,b in zip(pos.current_location(),sdec)) 
     if scr:
-        res = sg.popup_scrolled(mex, font=font, location=pos, size=siz, non_blocking=True)
+        res = sg.popup_scrolled(mex, font=font, location=pos, size=siz, non_blocking=True, keep_on_top=True)
     else:
         poop = sg.popup_yes_no if y_n else sg.popup
-        res = poop(mex, font=font, location=pos)
+        res = poop(mex, font=font, location=pos, keep_on_top=True)
     return True if res == "Yes" else False
 parse = False
 parse_delay = 1
@@ -805,7 +805,7 @@ while True:
             recnew = Record.capture(values)
             if recnew != recsav:
                 oksv = True
-                if not recnew.is_saved():
+                if not recnew.is_empty() and not recnew.is_saved():
                     oksv = popup("The current work is not saved, procede anyway?", True)
                 if oksv: Record.show(window, recsav)
             else:
@@ -827,7 +827,7 @@ window.close()
 #{
 #    "20200129125124360072": [
 #        "prova",
-#        "SA",
+#        "",
 #        "prova"
 #    ],
 #    "20200129142532727748": [
@@ -837,8 +837,13 @@ window.close()
 #    ],
 #    "20200129145430965394": [
 #        "oizx",
+#        "M",
+#        "oizx"
+#    ],
+#    "20200129152220108800": [
+#        "lol",
 #        "",
-#        ""
+#        "lol"
 #    ]
 #}
 ### FINE ###
