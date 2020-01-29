@@ -607,13 +607,17 @@ SFONT = (DFONT[0], int(DFONT[1]/10*9))  #font checkbox
 CH_FLEN = 30                            #full len in char of box
 # CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
 CH_SLEN = 17
-CH_FWID = 17                            #tot width char, hardcoded magicnumber
+CH_FWID = 18                            #tot width char, hardcoded magicnumber
 STD_REGEX = {"data" : ["regex", "flag", "testo"]}
 store = Appendsave(STD_REGEX)
 saved = [Record(r) for r in store.elenca()]
-layout = [
-    [   
+genre = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
+layout = [[
+        sg.Combo(genre, "findall", (9,1), key='regfun', readonly=True),
+        sg.Text("", size=(17,1)),
         sg.Button('?', key='help', tooltip="help"),
+    ],
+    [   
         sg.Checkbox("I", key="I", font=SFONT, tooltip="IGNORECASE"),
         sg.Checkbox("L", key="L", font=SFONT, tooltip="LOCALE (only with byte pattern)", disabled=True),
         sg.Checkbox("M", key="M", font=SFONT, tooltip="MULTILINE"),
@@ -648,7 +652,7 @@ if sg.name == "PySimpleGUI":
     SLOC, SSIZ, SDEC = preset_dim(sg) 
     offset = map(sum, zip(SLOC, map(lambda n: n//4, SSIZ)))
     window = sg.Window("rg", layout, location=offset,
-                        font=("Default", 20))
+                        font=("Default", 20))#, element_justification="right")
 elif sg.name == "PySimpleGUIWeb":
     window = sg.Window("rg", layout, font=DFONT)
 #endregion
