@@ -641,7 +641,7 @@ class exec_regex:
                     attr[k] = a 
             if fun == "findall":
                 print(cr, text, flags)
-                res = re.findall(cr, text, flags)
+                res = re.findall(cr, text)
         return res
 regexer = exec_regex.check_n_run
     
@@ -743,14 +743,16 @@ def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_F
 PARSE_DELAY = 1
 FLAGS_CMB  = "ILMSUXA"
 parse = False
-regex = regtext = text = flags_old = ""
+regex = regtext = text = ""
+flags_old = []
+flags_sum = 0
 start_cron = now()
 while True:
     #ogni secondo rilascio uno stato
     event, values = window.read(timeout=1000)  #un controllo al sec
     #dovrebbe togliere il focus quando si switcha con tab, ma...
-    if sg.name == "PySimpleGUI":
-        window['result'].Widget.config(takefocus=0)
+    # if sg.name == "PySimpleGUI":
+        # window['result'].Widget.config(takefocus=0)
 
     if event is None:   break       #quit dal programma
     elif event == "__TIMEOUT__":    #ad ogni cadenza
@@ -771,7 +773,7 @@ while True:
         if parse:
             if now()-start_cron >= PARSE_DELAY: 
                 parse = False
-                result = regexer(values['regfun'], regtext, text)
+                result = regexer(values['regfun'], text, regtext, flags_sum)
                 # result = re.findall(regex, text)
                 if not regtext: #con "" findall restituisce risultati vuoti
                     result = [s for s in result if s] #non consento
