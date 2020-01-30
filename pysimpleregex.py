@@ -8,6 +8,7 @@ from time import monotonic as now
 json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
 
+
 def preset_dim(sg):
     """
     return, position, size and offset caused by decorator
@@ -600,7 +601,50 @@ class Record:
         window['savedlist'].update(record, saved)
         return saved
 
-
+class exec_regex:
+    """
+    Questo è un esperimento, creo una classe ma come se fosse già un
+    oggetto istanziato, questo per avere il cambio di stato ma senza
+    dover istaniare oggetti dato che non mi servono. Volevo usare
+    @classmethod anche per l'init così da poter usare la classe come
+    una funzione, ma init può ritornare solo None. Posso comunque
+    overloattare __setattr__ così da evitare che venga usata una
+    istanza invece che la classe stessa come un istanza. E alla fine
+    invece dell'init posso creare una variabile come shortcut alla
+    funzione che mi interessa.
+    """
+    _attrs = {a:None for a in ("fun","text","regex","flags","count","replace")}
+    def __setattr__(self, name, value):
+        raise NameError("assigment not permitted, use class method")
+    @classmethod
+    def _update_regex(cls, regex='', flags=0):
+        if regex is None: regex = ''
+        if flags is None: flags = 0
+        try:
+            cls._compiled = re.compile(regex, flags)
+            cls._attrs["regex"] = regex
+            cls._attrs["flags"] = flags
+        except re.error:
+            cls._compiled = ''
+        return cls._compiled
+    @classmethod
+    def check_n_run(cls, fun=None, text=None, regex=None, flags=None, count=None, replace=None):
+        res = None
+        attr = cls._attrs
+        args = (fun, text, regex, flags, count, replace)
+        if any(a!=t for a,t in zip(args, attr.values())):
+            if  regex != attr['regex'] or flags != attr['flags']:
+                cls._update_regex(regex, flags)
+            cr = cls._compiled
+            for (k,v),a in zip(attr.items(), args):
+                if a is not None:
+                    attr[k] = a 
+            if fun == "findall":
+                print(cr, text, flags)
+                res = re.findall(cr, text, flags)
+        return res
+regexer = exec_regex.check_n_run
+    
 sg.theme('BrightColors')
 DFONT = ("Monospace", 20)               #def font
 SFONT = (DFONT[0], int(DFONT[1]/10*9))  #font checkbox
@@ -692,6 +736,10 @@ def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_F
         poop = sg.popup_yes_no if y_n else sg.popup
         res = poop(mex, font=font, location=pos, keep_on_top=True)
     return True if res == "Yes" else False
+    
+    if fun == "findall": re
+
+
 PARSE_DELAY = 1
 FLAGS_CMB  = "ILMSUXA"
 parse = False
@@ -704,12 +752,11 @@ while True:
     if sg.name == "PySimpleGUI":
         window['result'].Widget.config(takefocus=0)
 
-    if event is None:   #se premo su esc, escio
-        break 
-    elif event == "__TIMEOUT__": #nel caso l'evento sia la cadenza di aggiorn
-        #se la regex è cambiata l'aggiorno, [:-1] tolgo l'\n alla fine
+    if event is None:   break       #quit dal programma
+    elif event == "__TIMEOUT__":    #ad ogni cadenza
         flags_new = [f for f in FLAGS_CMB  if values[f]]
         if (flags_old != flags_new) or (regtext != values['regbox'][:-1]):
+            #se cambia flag/regex, ricompilo la regex e prenoto un parse
             flags_old = flags_new
             flags_sum = sum([eval("re."+f) for f in flags_old])
             regtext = values['regbox'][:-1]
@@ -724,7 +771,8 @@ while True:
         if parse:
             if now()-start_cron >= PARSE_DELAY: 
                 parse = False
-                result = re.findall(regex, text)
+                result = regexer(values['regfun'], regtext, text)
+                # result = re.findall(regex, text)
                 if not regtext: #con "" findall restituisce risultati vuoti
                     result = [s for s in result if s] #non consento
                 lr = len(str(len(result)))
