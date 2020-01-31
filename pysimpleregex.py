@@ -601,6 +601,42 @@ class Record:
         window['savedlist'].update(record, saved)
         return saved
 
+def trothled_debounce(tick, wait):
+    """
+    decoratore che posticipa l'esecuzine della funzione decorata, si
+    sottointende l'uso lanciando la funzione ad intervalli regolari.
+    la funzione decorata viene avviata solo quando non ci sono più
+    cambiamenti da un numero di volte di tick in wait.
+    
+    Parameters
+    ----------
+    tick : int
+        la duranta di un intervallo di scansione
+    wait : int
+        il delay di attesa, è da considerarsi più come numero tick
+        che di sencondi che devono passare (a meno che un tick==1sec)
+    
+    Returns
+    -------
+    function
+        decorated function
+    """
+    def decorate(delayedfun):
+        _start = 0
+        _value = None
+        def wrap(*args, **kwargs):
+            nonlocal _start, _value
+            _start += tick
+            if  _start >= wait:
+                val = (args, kwargs)
+                if val != _value:
+                   _value = val
+                   _start = 0
+                   result = delayedfun(*args, **kwargs)
+                   return result
+        return wrap
+    return decorate
+
 class exec_regex:
     """
     Questo è un esperimento, creo una classe ma come se fosse già un
