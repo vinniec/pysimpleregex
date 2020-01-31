@@ -541,16 +541,6 @@ class Record:
             rec = [store.timestamp()] + list(record) + [""]*(len(att)-1-len(record))
             for a,v in zip(att, rec):
                 self.__setattr__(a,v)
-        # elif len(record) == 3:
-        #     key = store.timestamp()
-        #     self.key = key
-        #     self.regex = record[0]
-        #     self.flags = record[1]
-        #     self.text = record[2]
-        # else:
-        #     self.key = store.timestamp()
-        #     self.regex = self.flags = self.text = ''
-            # raise ValueError("record inserted with wrong element number")
     def __str__(self):
         return self.record[self.key][0]
     def __eq__(self, other):
@@ -576,16 +566,58 @@ class Record:
         return any(self == Record(s) for s in store.elenca())
     @classmethod
     def capture(cls, values):
+        """
+        return a Record object from the current data showed in the gui
+        
+        Parameters
+        ----------
+        values : values from Window.read()
+            data returned from Window of pysimplegui
+        
+        Returns
+        -------
+        Record
+            current data object
+        """ 
         regex = values['regbox'][:-1]
         flags = ''.join([f for f in FLAGS_CMB  if values[f]])
         text = values['text'][:-1]
         return cls(regex, flags, text)
     @classmethod
+    def capturegex(cls, values):
+        """
+        capture current data from gui and execute a debounced regex
+        
+        Parameters
+        ----------
+        values : values of pysimplegui Window.read()
+            data captured from the gui
+        
+        Returns
+        -------
+        list or None
+            list of regex occurrencies
+        """
+        r = cls.capture(values)
+        meth = values['regfun']
+        flags = [f for f in FLAGS_CMB  if values[f]]
+        flags = sum([eval("re."+f) for f in flags])
+        return regexer(meth, r.text, r.regex, flags)
+    @classmethod
     def show(cls, window, *record):
+        """
+        show specified record
+    
+        Parameters
+        ----------
+        window : Window
+            istance of pysimplegui
+        record : Record or data
+            it is ok to pass a Record object or a record data
+        """
         if len(record) == 1 and isinstance(record[0], Record):
             record = record[0]
-        else:
-            record = Record(*record)
+        else: record = Record(*record)
         window['regbox'].update(record)
         for f in FLAGS_CMB :
             window[f].update(f in record.flags)
@@ -703,7 +735,6 @@ layout = [[
 #region calcolo posizione finestra quando la creo 
 if sg.name == "PySimpleGUI":
     SLOC, SSIZ, SDEC = preset_dim(sg) 
-    print(SLOC, SSIZ, SDEC)
     offset = map(sum, zip(SLOC, map(lambda n: n//4, SSIZ)))
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))#, element_justification="right")
@@ -750,7 +781,6 @@ def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_F
     if fun == "findall": re
 
 
-parse = False
 regex = regtext = text = ""
 flags = 0
 while True:
@@ -761,12 +791,7 @@ while True:
         # window['result'].Widget.config(takefocus=0)
     if event is None:   break       #quit dal programma
     elif event == "__TIMEOUT__":    #ad ogni cadenza
-        meth = values['regfun']
-        text = values['text'][:-1]
-        regtext = values['regbox'][:-1]
-        flags = [f for f in FLAGS_CMB  if values[f]]
-        flags = sum([eval("re."+f) for f in flags])
-        result = regexer(values['regfun'], text, regtext, flags)
+        result = Record.capturegex(values) #meglio accettare record da regexer?
         if result is not None:
             if result and any(result):
                 lr = len(str(len(result)))
