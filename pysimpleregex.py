@@ -8,6 +8,7 @@ from datetime import datetime
 json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
 #region costanti 
+PRESET_DIM = ((800, 0), (1104, 825), (5, 28))
 DFONT = ("Monospace", 20)               #def font
 SFONT = (DFONT[0], int(DFONT[1]/10*9))  #font checkbox
 CH_FLEN = 30                            #full len in char of box
@@ -34,7 +35,7 @@ def preset_dim(sg):
     ((int,int),(int,int),(int,int))
         start position of the screen, dimension and decorator shift
     """
-     
+    if isinstance(PRESET_DIM, tuple): return PRESET_DIM
     win = sg.Window('mlw', [[]], alpha_channel=0)
     win.read(timeout=0)
     lc1 = win.current_location()
@@ -702,6 +703,7 @@ layout = [[
 #region calcolo posizione finestra quando la creo 
 if sg.name == "PySimpleGUI":
     SLOC, SSIZ, SDEC = preset_dim(sg) 
+    print(SLOC, SSIZ, SDEC)
     offset = map(sum, zip(SLOC, map(lambda n: n//4, SSIZ)))
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))#, element_justification="right")
