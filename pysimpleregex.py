@@ -4,10 +4,21 @@ import re, pathlib
 import PySimpleGUI as sg    #import PySimpleGUIWeb as sg
 import jsonpickle as json
 from datetime import datetime
-from time import monotonic as now 
+# from time import monotonic as now 
 json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
-
+#region costanti 
+DFONT = ("Monospace", 20)               #def font
+SFONT = (DFONT[0], int(DFONT[1]/10*9))  #font checkbox
+CH_FLEN = 30                            #full len in char of box
+# CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
+CH_SLEN = 17
+CH_FWID = 18                            #tot width char, hardcoded magicnumber
+STD_REGEX = {"data" : ["regex", "flag", "testo"]}
+GENRE = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
+FLAGS_CMB = "ILMSUXA"
+DELAY = 0.25
+#endregion
 
 def preset_dim(sg):
     """
@@ -601,7 +612,7 @@ class Record:
         window['savedlist'].update(record, saved)
         return saved
 
-def trothled_debounce(tick, wait):
+def throttle_debounce(tick, wait):
     """
     decoratore che posticipa l'esecuzine della funzione decorata, si
     sottointende l'uso lanciando la funzione ad intervalli regolari.
@@ -624,76 +635,38 @@ def trothled_debounce(tick, wait):
     def decorate(delayedfun):
         _start = 0
         _value = None
+        _lst_e = None
         def wrap(*args, **kwargs):
-            nonlocal _start, _value
-            _start += tick
-            if  _start >= wait:
-                val = (args, kwargs)
-                if val != _value:
+            nonlocal _start, _value, _lst_e
+            val = (args, kwargs)
+            if val != _lst_e:       #ho fatto una modifica
+                _start = 0
+                _lst_e = val
+            elif _lst_e != _value:  #ho smesso di fare modifiche
+                _start += tick
+                if _start >= wait:  #ho smesso per n volte
                    _value = val
                    _start = 0
                    result = delayedfun(*args, **kwargs)
                    return result
         return wrap
     return decorate
-
-class exec_regex:
-    """
-    Questo è un esperimento, creo una classe ma come se fosse già un
-    oggetto istanziato, questo per avere il cambio di stato ma senza
-    dover istaniare oggetti dato che non mi servono. Volevo usare
-    @classmethod anche per l'init così da poter usare la classe come
-    una funzione, ma init può ritornare solo None. Posso comunque
-    overloattare __setattr__ così da evitare che venga usata una
-    istanza invece che la classe stessa come un istanza. E alla fine
-    invece dell'init posso creare una variabile come shortcut alla
-    funzione che mi interessa.
-    """
-    _attrs = {a:None for a in ("fun","text","regex","flags","count","replace")}
-    def __setattr__(self, name, value):
-        raise NameError("assigment not permitted, use class method")
-    @classmethod
-    def _update_regex(cls, regex='', flags=0):
-        if regex is None: regex = ''
-        if flags is None: flags = 0
-        try:
-            cls._compiled = re.compile(regex, flags)
-            cls._attrs["regex"] = regex
-            cls._attrs["flags"] = flags
-        except re.error:
-            cls._compiled = ''
-        return cls._compiled
-    @classmethod
-    def check_n_run(cls, fun=None, text=None, regex=None, flags=None, count=None, replace=None):
-        res = None
-        attr = cls._attrs
-        args = (fun, text, regex, flags, count, replace)
-        if any(a!=t for a,t in zip(args, attr.values())):
-            if  regex != attr['regex'] or flags != attr['flags']:
-                cls._update_regex(regex, flags)
-            cr = cls._compiled
-            for (k,v),a in zip(attr.items(), args):
-                if a is not None:
-                    attr[k] = a 
-            if fun == "findall":
-                print(cr, text, flags)
-                res = re.findall(cr, text)
-        return res
-regexer = exec_regex.check_n_run
+@throttle_debounce(DELAY, DELAY*3)
+def regexer(meth, text, regex, flags=0, count=0, replace=""):
+    #non compilo la regex perché i metodi usano una già incorporata
+    if meth in ('search', 'match'):
+        result = getattr(re, meth)(regex, text, flags)
+        if result is not None:
+            result = result.groups()
+        return result
+    elif meth == 'findall':
+        return re.findall(regex, text, flags)
     
 sg.theme('BrightColors')
-DFONT = ("Monospace", 20)               #def font
-SFONT = (DFONT[0], int(DFONT[1]/10*9))  #font checkbox
-CH_FLEN = 30                            #full len in char of box
-# CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
-CH_SLEN = 17
-CH_FWID = 18                            #tot width char, hardcoded magicnumber
-STD_REGEX = {"data" : ["regex", "flag", "testo"]}
 store = Appendsave(STD_REGEX)
 saved = [Record(r) for r in store.elenca()]
-genre = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
 layout = [[
-        sg.Combo(genre, "findall", (9,1), key='regfun', readonly=True),
+        sg.Combo(GENRE, "findall", (9,1), key='regfun', readonly=True),
         sg.Text("", size=(17,1)),
         sg.Button('?', key='help', tooltip="help"),
     ],
@@ -725,7 +698,6 @@ layout = [[
 #enter_submits non funziona, almeno non in accoppiata con do_not_clear
 #multiline ha sempre un \n alla fine anche se è vuoto
 #Output cattura anche stder e stdout!
-
 
 #region calcolo posizione finestra quando la creo 
 if sg.name == "PySimpleGUI":
@@ -776,48 +748,31 @@ def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_F
     if fun == "findall": re
 
 
-PARSE_DELAY = 1
-FLAGS_CMB  = "ILMSUXA"
 parse = False
 regex = regtext = text = ""
-flags_old = []
-flags_sum = 0
-start_cron = now()
+flags = 0
 while True:
     #ogni secondo rilascio uno stato
-    event, values = window.read(timeout=1000)  #un controllo al sec
+    event, values = window.read(timeout=DELAY*1000)  #un controllo al sec
     #dovrebbe togliere il focus quando si switcha con tab, ma...
     # if sg.name == "PySimpleGUI":
         # window['result'].Widget.config(takefocus=0)
-
     if event is None:   break       #quit dal programma
     elif event == "__TIMEOUT__":    #ad ogni cadenza
-        flags_new = [f for f in FLAGS_CMB  if values[f]]
-        if (flags_old != flags_new) or (regtext != values['regbox'][:-1]):
-            #se cambia flag/regex, ricompilo la regex e prenoto un parse
-            flags_old = flags_new
-            flags_sum = sum([eval("re."+f) for f in flags_old])
-            regtext = values['regbox'][:-1]
-            try:                regex = re.compile(regtext, flags_sum)
-            except re.error:    regex = ''
-            parse = True
-            start_cron = now()
-        if text != values['text'][:-1]:     #se il testo è cambiato l'aggiorno
-            text = values['text'][:-1]
-            parse = True
-            start_cron = now()
-        if parse:
-            if now()-start_cron >= PARSE_DELAY: 
-                parse = False
-                result = regexer(values['regfun'], text, regtext, flags_sum)
-                # result = re.findall(regex, text)
-                if not regtext: #con "" findall restituisce risultati vuoti
-                    result = [s for s in result if s] #non consento
+        meth = values['regfun']
+        text = values['text'][:-1]
+        regtext = values['regbox'][:-1]
+        flags = [f for f in FLAGS_CMB  if values[f]]
+        flags = sum([eval("re."+f) for f in flags])
+        result = regexer(values['regfun'], text, regtext, flags)
+        if result is not None:
+            if result and any(result):
                 lr = len(str(len(result)))
                 result = [f"{n:0{lr}}) {s}" for n, s in enumerate(result,1)]
                 result = "\n".join(result)
                 window['result'].update(result)
-                start_cron = now()
+            else:
+                window['result'].update('')
     elif event == "help":
         mex =   r"Special Character (_ for cont)" + "\n" \
                 r".   all except newline(dotall)" + "\n" \
@@ -921,9 +876,9 @@ window.close()
 #        "prova"
 #    ],
 #    "20200129142532727748": [
-#        "prova2",
+#        "prova23",
 #        "SA",
-#        "prova2"
+#        "prova23"
 #    ],
 #    "20200129145430965394": [
 #        "oizx",
