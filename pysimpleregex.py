@@ -15,10 +15,10 @@ CH_FLEN = 30                            #full len in char of box
 # CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
 CH_SLEN = 17
 CH_FWID = 18                            #tot width char, hardcoded magicnumber
-STD_REGEX = {"data" : ["regex", "flag", "testo"]}
+STD_REGEX = {"data" : ["regex", "flag", "testo"]} #(meth, text, regex, flags=0, count=0, replace="")
 GENRE = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
 FLAGS_CMB = "ILMSUXA"
-DELAY = 0.750; DETAIL = DELAY/3         #elapsed time / subdivision between checks
+DELAY = 0.750; DETAIL = DELAY/3         #elapsedtime/subdivision between checks
 #endregion
 
 def preset_dim(sg):
@@ -428,7 +428,8 @@ class Appendsave:
                         self.prev = self._next  #prima di uno stopiterator questa viene
                         self._next = next(self.schema_iter) #eseguita
                         return self._next
-                self._schema_last = schema #salvo l'ultimo schema passato
+                self._schema_last = schema  #salvo l'ultimo schema passato
+                self._record_last_len = 0   #lung ultimo record per validazione
                 schema = Validiter(schema)
 
             if val is None: #importa i dati e attiva la sstanza se si passa None a val
@@ -438,6 +439,7 @@ class Appendsave:
         if valida:  #valida schema
             try:
                 it_ind, it_lev, it_tip = next(schema)
+                self._record_last_len += 1
                 if not isinstance(val, it_tip) or it_lev != lev:
                     raise TypeError('corrispondenza invalida')
             except (TypeError, StopIteration):
@@ -473,6 +475,13 @@ class Appendsave:
                 if stampa: print("."*lev, val, sep='')
                 yield val
     def valida(self, val):
+        result = list(self.discendi(val, schema=self.schema))
+        lenv = self._record_last_len
+        lens = len(self.schema)
+        if lenv != lens:
+            er =  f"Validazione Fallita, schema non corrispondente:\n"\
+                  f"{lenv} elementi su un totale di {lens}"
+            raise TypeError(er)
         return list(self.discendi(val, schema=self.schema))
 
     def timestamp(self):
@@ -899,25 +908,15 @@ window.close()
 
 ### SAVE ###
 #{
-#    "20200129125124360072": [
+#    "20200201181521401396": [
+#        "asd",
+#        "",
+#        "asd"
+#    ],
+#    "20200201182416276183": [
 #        "prova",
 #        "",
 #        "prova"
-#    ],
-#    "20200129142532727748": [
-#        "prova23",
-#        "SA",
-#        "prova23"
-#    ],
-#    "20200129145430965394": [
-#        "oizx",
-#        "M",
-#        "oizx"
-#    ],
-#    "20200129152220108800": [
-#        "lol",
-#        "",
-#        "lol"
 #    ]
 #}
 ### FINE ###
