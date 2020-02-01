@@ -687,13 +687,15 @@ def throttle_debounce(tick, wait):
 @throttle_debounce(DELAY, DELAY*3)
 def regexer(meth, text, regex, flags=0, count=0, replace=""):
     #non compilo la regex perché i metodi usano una già incorporata
-    if meth in ('search', 'match'):
+    if meth in ('fullmatch', 'match', 'search'):
         result = getattr(re, meth)(regex, text, flags)
         if result is not None:
-            result = result.groups()
-        return result
+            result = result.regs
+            if result == ((0, 0),): result = ('',)
+        else: result = ()
     elif meth == 'findall':
-        return re.findall(regex, text, flags)
+        result = re.findall(regex, text, flags)
+    return result
     
 sg.theme('BrightColors')
 store = Appendsave(STD_REGEX)
