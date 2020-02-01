@@ -18,7 +18,7 @@ CH_FWID = 18                            #tot width char, hardcoded magicnumber
 STD_REGEX = {"data" : ["regex", "flag", "testo"]}
 GENRE = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
 FLAGS_CMB = "ILMSUXA"
-DELAY = 0.25
+DELAY = 0.750; DETAIL = DELAY/3         #elapsed time / subdivision between checks
 #endregion
 
 def preset_dim(sg):
@@ -645,20 +645,20 @@ class Record:
         window['savedlist'].update(record, saved)
         return saved
 
-def throttle_debounce(tick, wait):
+def throttle_debounce(tic, wait):
     """
     decoratore che posticipa l'esecuzine della funzione decorata, si
     sottointende l'uso lanciando la funzione ad intervalli regolari.
     la funzione decorata viene avviata solo quando non ci sono più
-    cambiamenti da un numero di volte di tick in wait.
+    cambiamenti da un numero di volte di tic in wait.
     
     Parameters
     ----------
-    tick : int
+    tic : int
         la duranta di un intervallo di scansione
     wait : int
-        il delay di attesa, è da considerarsi più come numero tick
-        che di sencondi che devono passare (a meno che un tick==1sec)
+        il delay di attesa, è da considerarsi più come numero tic
+        che di sencondi che devono passare (a meno che un tic==1sec)
     
     Returns
     -------
@@ -676,7 +676,7 @@ def throttle_debounce(tick, wait):
                 _start = 0
                 _lst_e = val
             elif _lst_e != _value:  #ho smesso di fare modifiche
-                _start += tick
+                _start += tic
                 if _start >= wait:  #ho smesso per n volte
                    _value = val
                    _start = 0
@@ -684,7 +684,7 @@ def throttle_debounce(tick, wait):
                    return result
         return wrap
     return decorate
-@throttle_debounce(DELAY, DELAY*3)
+@throttle_debounce(DETAIL, DELAY)
 def regexer(meth, text, regex, flags=0, count=0, replace=""):
     #non compilo la regex perché i metodi usano una già incorporata
     if meth in ('fullmatch', 'match', 'search'):
