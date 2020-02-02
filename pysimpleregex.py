@@ -15,10 +15,10 @@ CH_FLEN = 30                            #full len in char of box
 # CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
 CH_SLEN = 17
 CH_FWID = 18                            #tot width char, hardcoded magicnumber
-STD_REGEX = {"data" : ["regex", "flag", "testo"]} #(meth, text, regex, flags=0, count=0, replace="")
+STD_REGEX = {"data" : ["fun", "regex", "flag", "testo"]} #(count=0, replace="")
 GENRE = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
 FLAGS_CMB = "ILMSUXA"
-DELAY = 0.750; DETAIL = DELAY/3         #elapsedtime/subdivision between checks
+DELAY = 1; DETAIL = DELAY/2         #elapsedtime/subdivision between checks
 #endregion
 
 def preset_dim(sg):
@@ -524,15 +524,16 @@ class Record:
 
     @property
     def record(self):
-        return {self.key : [self.regex, self.flags, self.text]}
+        return {self.key : [self.fun, self.regex, self.flags, self.text]}
     @record.setter
     def record(self, dati):
         key = next(iter(dati.keys()))
         dati = dati[key]
         self.key = key
-        self.regex = dati[0]
-        self.flags = dati[1]
-        self.text =  dati[2]
+        self.fun =   dati[0]
+        self.regex = dati[1]
+        self.flags = dati[2]
+        self.text =  dati[3]
 
     def __init__(self, *record):
         """
@@ -546,12 +547,13 @@ class Record:
             record = record[0]
             self.record = record
         else:
-            att = ['key', 'regex', 'flags', 'text']
+            att = ['key', 'fun', 'regex', 'flags', 'text']
             rec = [store.timestamp()] + list(record) + [""]*(len(att)-1-len(record))
             for a,v in zip(att, rec):
+                if a == 'fun' and not v: v = "findall"
                 self.__setattr__(a,v)
     def __str__(self):
-        return self.record[self.key][0]
+        return self.record[self.key][1]
     def __eq__(self, other):
         """
         vero se gli elementi sono uguali (le chiavi non sono importanti)
@@ -587,11 +589,12 @@ class Record:
         -------
         Record
             current data object
-        """ 
+        """
+        fun = values['regfun']
         regex = values['regbox'][:-1]
         flags = ''.join([f for f in FLAGS_CMB  if values[f]])
         text = values['text'][:-1]
-        return cls(regex, flags, text)
+        return cls(fun, regex, flags, text)
     @classmethod
     def capturegex(cls, values):
         """
@@ -608,14 +611,13 @@ class Record:
             list of regex occurrencies
         """
         r = cls.capture(values)
-        meth = values['regfun']
         flags = [f for f in FLAGS_CMB  if values[f]]
         flags = sum([eval("re."+f) for f in flags])
-        return regexer(meth, r.text, r.regex, flags)
+        return regexer(r.fun, r.text, r.regex, flags)
     @classmethod
     def show(cls, window, *record):
         """
-        show specified record
+        show specified record ok the interface
     
         Parameters
         ----------
@@ -627,10 +629,11 @@ class Record:
         if len(record) == 1 and isinstance(record[0], Record):
             record = record[0]
         else: record = Record(*record)
-        window['regbox'].update(record)
+        window['regfun'].update(record.fun)
+        window['regbox'].update(record.regex)
         for f in FLAGS_CMB :
             window[f].update(f in record.flags)
-        window['text'].update(record)
+        window['text'].update(record.text)
     @classmethod
     def updatelist(cls, window, record=None):
         """
@@ -694,16 +697,18 @@ def throttle_debounce(tic, wait):
         return wrap
     return decorate
 @throttle_debounce(DETAIL, DELAY)
-def regexer(meth, text, regex, flags=0, count=0, replace=""):
+def regexer(fun, text, regex, flags=0, count=0, replace=""):
     #non compilo la regex perché i metodi usano una già incorporata
-    if meth in ('fullmatch', 'match', 'search'):
-        result = getattr(re, meth)(regex, text, flags)
+    if fun in ('fullmatch', 'match', 'search'):
+        result = getattr(re, fun)(regex, text, flags)
         if result is not None:
             result = result.regs
             if result == ((0, 0),): result = ('',)
         else: result = ()
-    elif meth == 'findall':
+    elif fun == 'findall':
         result = re.findall(regex, text, flags)
+    else:
+        result = [""]
     return result
     
 sg.theme('BrightColors')
@@ -796,7 +801,7 @@ regex = regtext = text = ""
 flags = 0
 while True:
     #ogni secondo rilascio uno stato
-    event, values = window.read(timeout=DELAY*1000)  #un controllo al sec
+    event, values = window.read(timeout=DETAIL*1000)  #un controllo al sec
     #dovrebbe togliere il focus quando si switcha con tab, ma...
     # if sg.name == "PySimpleGUI":
         # window['result'].Widget.config(takefocus=0)
@@ -908,15 +913,17 @@ window.close()
 
 ### SAVE ###
 #{
-#    "20200201181521401396": [
-#        "asd",
-#        "",
-#        "asd"
-#    ],
-#    "20200201182416276183": [
+#    "20200202053104140329": [
+#        "findall",
 #        "prova",
-#        "",
+#        "I",
 #        "prova"
+#    ],
+#    "20200202181858620779": [
+#        "search",
+#        "s",
+#        "S",
+#        "asd"
 #    ]
 #}
 ### FINE ###
