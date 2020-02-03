@@ -21,6 +21,7 @@ CH_SLEN = 17
 CH_FWID = 18                            #tot width char, hardcoded magicnumber
 STD_REGEX = {"data" : ["fun", "regex", "flag", "testo", 0, "replace"]}
 GENRE = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
+GENIN = GENRE[0]
 FLAGS_CMB = "ILMSUXA"
 DELAY = 1; DETAIL = DELAY/2         #elapsedtime/subdivision between checks
 #endregion
@@ -525,6 +526,8 @@ class Record:
     classe di supporto per poter avere oggetti e non stringhe combo box
     di pysimplegui. Viene ritornato __str__ 
     """
+    prefun = GENIN
+    presub = ''
 
     @property
     def record(self):
@@ -603,10 +606,44 @@ class Record:
         text = values['text'][:-1]
         count = values['cntbox']
         count = int(count) if count.isdecimal() else 0
-        replace = values['subbox'][:-1]
+        rep = values['subbox']
+        replace = values['subbox'][:-1] if values['subbox'] != "None\n" else '' #X BUG MULTILINE
         return cls(fun, regex, flags, text, count, replace)
     @classmethod
-    def capturegex(cls, values):
+    def gui_adapt(cls, window, record):
+        if record.fun != cls.prefun:                #se cambia funzione
+            print(cls.prefun, record.fun)
+            if record.fun in ("sub", "subn"):       #in una sub
+                if cls.prefun in ("sub", "subn"):   #ed era una sub
+                    cls.presub = record.replace     #registro il valore per precedente
+                else: 
+                    if cls.prefun != "split":
+                        window['cntbox'].update(disabled=False)
+                        window['cntbox'].update(text_color="black")
+                    window['subbox'].update(disabled=False)
+                    window['subbox'].update(text_color="black")
+                    window['subbox'].update(cls.presub)  #X BUG MULTILINE
+            elif record.fun == "split":
+                if cls.prefun in ("sub", "subn"):
+                    cls.presub = ""
+                    window['subbox'].update("")
+                    window['subbox'].update(text_color="#d9d9d9")
+                    window['subbox'].update(disabled=True)
+                window['cntbox'].update(disabled=False)
+                window['cntbox'].update(text_color="black")
+            else:
+                if cls.prefun in ("split", "sub", "subn"):
+                    window['cntbox'].update("0")
+                    window['cntbox'].update(text_color="#d9d9d9")
+                    window['cntbox'].update(disabled=True)
+                    if cls.prefun != "split":
+                        cls.presub = ""
+                        window['subbox'].update("")
+                        window['subbox'].update(text_color="#d9d9d9")
+                        window['subbox'].update(disabled=True)
+            cls.prefun = record.fun
+    @classmethod
+    def capturegex(cls, values, window):
         """
         capture current data from gui and execute a debounced regex
         
@@ -621,6 +658,7 @@ class Record:
             list of regex occurrencies
         """
         r = cls.capture(values)
+        cls.gui_adapt(window, r)
         flags = [f for f in FLAGS_CMB  if values[f]]
         flags = sum([eval("re."+f) for f in flags])
         return regexer(r.fun, r.text, r.regex, flags, r.count, r.replace)
@@ -639,6 +677,7 @@ class Record:
         if len(record) == 1 and isinstance(record[0], Record):
             record = record[0]
         else: record = Record(*record)
+        cls.gui_adapt(window, record)
         window['regfun'].update(record.fun)
         window['regbox'].update(record.regex)
         for f in FLAGS_CMB :
@@ -732,7 +771,7 @@ store = Appendsave(STD_REGEX)
 saved = [Record(r) for r in store.elenca()]
 layout = [
     [
-        sg.Combo(GENRE, "findall", (9,1), key='regfun', font=SFONT, readonly=True),
+        sg.Combo(GENRE, GENIN, (9,1), key='regfun', font=SFONT, readonly=True, enable_events=True),
         # sg.Text("", size=(0,0)),
         sg.Checkbox("I", key="I", font=SFONT, tooltip="IGNORECASE"),
         sg.Checkbox("L", key="L", font=SFONT, tooltip="LOCALE (only with byte pattern)", disabled=True),
@@ -745,10 +784,11 @@ layout = [
         sg.Button('?', key='help', font=SFONT, tooltip="help"),
     ],    
     [   
-        sg.InputText("0", (CH_1_10,1), False, key="cntbox", justification='right', visible=True),
+        sg.InputText("0", (CH_1_10,1), True, key="cntbox", justification='right',
+                     visible=True, background_color="#d9d9d9", text_color="#d9d9d9"), 
         sg.VerticalSeparator(pad=(0,1)),
-        sg.Multiline(size=(CH_9_10,1), disabled=False, key="subbox", visible=True,
-                           autoscroll=True, background_color="#d9d9d9"),
+        sg.Multiline(size=(CH_9_10,1), disabled=False, key="subbox", autoscroll=True,
+                     visible=True, background_color="#d9d9d9", text_color="#d9d9d9"),
     ],
     [sg.Multiline(key="regbox", size=(CH_FLEN,3), autoscroll=True, focus=True)],
     [sg.Multiline(key="text", size=(CH_FLEN,6), autoscroll=True)],
@@ -775,6 +815,8 @@ elif sg.name == "PySimpleGUIWeb":
     window = sg.Window("rg", layout, font=BFONT)
 #endregion
 #window['savedlist'].expand(True) #non funge, come espandere combo?
+window.finalize(); window['subbox'].update(disabled=True) #X BUG MULTILINE
+
 
 def popup(mex, y_n=False, scr=False, font=BFONT, pos=window, siz=(CH_FLEN+1,CH_FWID)):
     """
@@ -816,6 +858,7 @@ def popup(mex, y_n=False, scr=False, font=BFONT, pos=window, siz=(CH_FLEN+1,CH_F
 
 regex = regtext = text = ""
 flags = 0
+presub = [GENIN, ''] #X BUG MULTILINE
 while True:
     #ogni secondo rilascio uno stato
     event, values = window.read(timeout=DETAIL*1000)  #un controllo al sec
@@ -824,7 +867,7 @@ while True:
         # window['result'].Widget.config(takefocus=0)
     if event is None:   break       #quit dal programma
     elif event == "__TIMEOUT__":    #ad ogni cadenza
-        result = Record.capturegex(values) #meglio accettare record da regexer?
+        result = Record.capturegex(values, window) #meglio accettare record da regexer?
         if result is not None:
             if result and any(result):
                 lr = len(str(len(result)))
@@ -880,6 +923,28 @@ while True:
                 r"X   ignore wspace and comment" + "\n" \
                 r"A   \w\W\b\B\d\D ascii setted"
         popup(mex, scr=True)
+    # elif event == "regfun":
+    #     presub[1] = values['subbox'][:-1] if presub[0] in ("sub", "subn") else "" #X BUG MULTILINE
+    #     if values['regfun'] == "split":
+    #         window['cntbox'].update(disabled=False)
+    #         window['cntbox'].update(text_color="black")
+    #         window['subbox'].update("")
+    #         window['subbox'].update(text_color="#d9d9d9")
+    #         window['subbox'].update(disabled=True)
+    #     elif values['regfun'] in ("sub", "subn"):
+    #         window['cntbox'].update(disabled=False)
+    #         window['cntbox'].update(text_color="black")
+    #         window['subbox'].update(disabled=False)
+    #         window['subbox'].update(text_color="black")
+    #         window['subbox'].update(presub[1])  #X BUG MULTILINE
+    #     else:
+    #         window['cntbox'].update("0")
+    #         window['cntbox'].update(text_color="#d9d9d9")
+    #         window['cntbox'].update(disabled=True)
+    #         window['subbox'].update("")
+    #         window['subbox'].update(text_color="#d9d9d9")
+    #         window['subbox'].update(disabled=True)
+    #     presub[0] = values['regfun']
     elif event == "new":
         recnew = Record.capture(values)
         oksv = True
@@ -912,7 +977,8 @@ while True:
                 oksv = True
                 if not recnew.is_empty() and not recnew.is_saved():
                     oksv = popup("The current work is not saved, procede anyway?", True)
-                if oksv: Record.show(window, recsav)
+                if oksv:
+                    Record.show(window, recsav)
             else:
                 popup("you load save with same content")
         else:
@@ -929,5 +995,22 @@ while True:
 window.close()
 
 ### SAVE ###
-#{}
+#{
+#    "20200203063737013562": [
+#        "sub",
+#        "x",
+#        "",
+#        "axantiaro",
+#        0,
+#        "-"
+#    ],
+#    "20200203081159421104": [
+#        "split",
+#        "a",
+#        "I",
+#        "tanerArqeataz",
+#        3,
+#        ""
+#    ]
+#}
 ### FINE ###
