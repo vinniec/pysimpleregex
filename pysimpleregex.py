@@ -9,13 +9,17 @@ json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
 #region costanti 
 PRESET_DIM = ((800, 0), (1104, 825), (5, 28))
-DFONT = ("Monospace", 20)               #def font
-SFONT = (DFONT[0], int(DFONT[1]/10*9))  #font checkbox
+TFONT = "Monospace"
+DFONT = 20
+BFONT = (TFONT, DFONT)                  #big font
+SFONT = (TFONT, int(DFONT/3*2))         #font checkbox
 CH_FLEN = 30                            #full len in char of box
+CH_1_10 = int(CH_FLEN / 10)
+CH_9_10 = int(CH_FLEN / 15 * 13)
 # CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
 CH_SLEN = 17
 CH_FWID = 18                            #tot width char, hardcoded magicnumber
-STD_REGEX = {"data" : ["fun", "regex", "flag", "testo"]} #(count=0, replace="")
+STD_REGEX = {"data" : ["fun", "regex", "flag", "testo", 0, "replace"]}
 GENRE = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
 FLAGS_CMB = "ILMSUXA"
 DELAY = 1; DETAIL = DELAY/2         #elapsedtime/subdivision between checks
@@ -524,16 +528,18 @@ class Record:
 
     @property
     def record(self):
-        return {self.key : [self.fun, self.regex, self.flags, self.text]}
+        return {self.key : [self.fun, self.regex, self.flags, self.text, self.count, self.replace]}
     @record.setter
     def record(self, dati):
         key = next(iter(dati.keys()))
         dati = dati[key]
-        self.key = key
-        self.fun =   dati[0]
-        self.regex = dati[1]
-        self.flags = dati[2]
-        self.text =  dati[3]
+        self.key     = key
+        self.fun     = dati[0]
+        self.regex   = dati[1]
+        self.flags   = dati[2]
+        self.text    = dati[3]
+        self.count   = dati[4]
+        self.replace = dati[5]
 
     def __init__(self, *record):
         """
@@ -547,10 +553,11 @@ class Record:
             record = record[0]
             self.record = record
         else:
-            att = ['key', 'fun', 'regex', 'flags', 'text']
+            att = ['key', 'fun', 'regex', 'flags', 'text', 'count', 'replace']
             rec = [store.timestamp()] + list(record) + [""]*(len(att)-1-len(record))
             for a,v in zip(att, rec):
-                if a == 'fun' and not v: v = "findall"
+                if a == 'fun' and not v: v = "findall"  #valori di default per
+                elif a == 'count' and not v: v = 0    #evitare i campi vuoti
                 self.__setattr__(a,v)
     def __str__(self):
         return self.record[self.key][1]
@@ -571,7 +578,7 @@ class Record:
         return all(a==b for a,b in zip(self.record.values(), other.record.values()))
     def is_empty(self):
         """return True if the record is void"""
-        return not any((self.regex, self.flags, self.text))
+        return not any((self.regex, self.flags, self.text, self.count, self.replace))
     def is_saved(self):
         """return True if record is already saved"""
         return any(self == Record(s) for s in store.elenca())
@@ -594,7 +601,10 @@ class Record:
         regex = values['regbox'][:-1]
         flags = ''.join([f for f in FLAGS_CMB  if values[f]])
         text = values['text'][:-1]
-        return cls(fun, regex, flags, text)
+        count = values['cntbox']
+        count = int(count) if count.isdecimal() else 0
+        replace = values['subbox'][:-1]
+        return cls(fun, regex, flags, text, count, replace)
     @classmethod
     def capturegex(cls, values):
         """
@@ -613,7 +623,7 @@ class Record:
         r = cls.capture(values)
         flags = [f for f in FLAGS_CMB  if values[f]]
         flags = sum([eval("re."+f) for f in flags])
-        return regexer(r.fun, r.text, r.regex, flags)
+        return regexer(r.fun, r.text, r.regex, flags, r.count, r.replace)
     @classmethod
     def show(cls, window, *record):
         """
@@ -634,6 +644,8 @@ class Record:
         for f in FLAGS_CMB :
             window[f].update(f in record.flags)
         window['text'].update(record.text)
+        window['cntbox'].update(record.count)
+        window['subbox'].update(record.replace)
     @classmethod
     def updatelist(cls, window, record=None):
         """
@@ -707,6 +719,10 @@ def regexer(fun, text, regex, flags=0, count=0, replace=""):
         else: result = ()
     elif fun == 'findall':
         result = re.findall(regex, text, flags)
+    elif fun == "split":
+        result = re.split(regex, text, count, flags)
+    elif fun in ('sub', 'subn'):
+        result = [getattr(re, fun)(regex, replace, text, count, flags)]
     else:
         result = [""]
     return result
@@ -714,12 +730,10 @@ def regexer(fun, text, regex, flags=0, count=0, replace=""):
 sg.theme('BrightColors')
 store = Appendsave(STD_REGEX)
 saved = [Record(r) for r in store.elenca()]
-layout = [[
-        sg.Combo(GENRE, "findall", (9,1), key='regfun', readonly=True),
-        sg.Text("", size=(17,1)),
-        sg.Button('?', key='help', tooltip="help"),
-    ],
-    [   
+layout = [
+    [
+        sg.Combo(GENRE, "findall", (9,1), key='regfun', font=SFONT, readonly=True),
+        # sg.Text("", size=(0,0)),
         sg.Checkbox("I", key="I", font=SFONT, tooltip="IGNORECASE"),
         sg.Checkbox("L", key="L", font=SFONT, tooltip="LOCALE (only with byte pattern)", disabled=True),
         sg.Checkbox("M", key="M", font=SFONT, tooltip="MULTILINE"),
@@ -727,14 +741,17 @@ layout = [[
         sg.Checkbox("U", key="U", font=SFONT, tooltip="UNICODE (default if not ascii)", disabled=True),
         sg.Checkbox("X", key="X", font=SFONT, tooltip="VERBOSE"),
         sg.Checkbox("A", key="A", font=SFONT, tooltip="ASCII"),
+        sg.VerticalSeparator(),
+        sg.Button('?', key='help', font=SFONT, tooltip="help"),
+    ],    
+    [   
+        sg.InputText("0", (CH_1_10,1), False, key="cntbox", justification='right', visible=True),
+        sg.VerticalSeparator(pad=(0,1)),
+        sg.Multiline(size=(CH_9_10,1), disabled=False, key="subbox", visible=True,
+                           autoscroll=True, background_color="#d9d9d9"),
     ],
-    [sg.Multiline(key="regbox", size=(CH_FLEN,3), autoscroll=True,
-                  focus=True, # ~ enable_events=True, 
-                  enter_submits=True, do_not_clear=True,
-    )],
-    [sg.Multiline(key="text", size=(CH_FLEN,6), autoscroll=True,
-                  enter_submits=True, do_not_clear=True,
-    )],
+    [sg.Multiline(key="regbox", size=(CH_FLEN,3), autoscroll=True, focus=True)],
+    [sg.Multiline(key="text", size=(CH_FLEN,6), autoscroll=True)],
     [sg.Multiline(key="result", size=(CH_FLEN, 6), autoscroll=True, disabled=True)],
     [   
         sg.Button('N', key='new', tooltip="new"),
@@ -755,11 +772,11 @@ if sg.name == "PySimpleGUI":
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))#, element_justification="right")
 elif sg.name == "PySimpleGUIWeb":
-    window = sg.Window("rg", layout, font=DFONT)
+    window = sg.Window("rg", layout, font=BFONT)
 #endregion
 #window['savedlist'].expand(True) #non funge, come espandere combo?
 
-def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_FWID)):
+def popup(mex, y_n=False, scr=False, font=BFONT, pos=window, siz=(CH_FLEN+1,CH_FWID)):
     """
     shorcut to preconfigured popup format
     
@@ -772,7 +789,7 @@ def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_F
     scr : bool, optional
         if popup is scrollable (disable y_n), by default False
     font : tuple, optional
-        font format of pysimplegui, by default DFONT
+        font format of pysimplegui, by default BFONT
     pos : (int,int), optional
         upper-left position of the popup, can be windows object and
         reflect topleft of window, or PySimpleGUI module and reflect
@@ -912,18 +929,5 @@ while True:
 window.close()
 
 ### SAVE ###
-#{
-#    "20200202053104140329": [
-#        "findall",
-#        "prova",
-#        "I",
-#        "prova"
-#    ],
-#    "20200202181858620779": [
-#        "search",
-#        "s",
-#        "S",
-#        "asd"
-#    ]
-#}
+#{}
 ### FINE ###
