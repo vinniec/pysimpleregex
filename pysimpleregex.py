@@ -806,12 +806,12 @@ layout = [
 #Output cattura anche stder e stdout!
 
 #region calcolo posizione finestra quando la creo 
-if sg.name == "PySimpleGUI":
+if sg.__name__ == "PySimpleGUI":
     SLOC, SSIZ, SDEC = preset_dim(sg) 
     offset = map(sum, zip(SLOC, map(lambda n: n//4, SSIZ)))
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))#, element_justification="right")
-elif sg.name == "PySimpleGUIWeb":
+elif sg.__name__ == "PySimpleGUIWeb":
     window = sg.Window("rg", layout, font=BFONT)
 #endregion
 #window['savedlist'].expand(True) #non funge, come espandere combo?
@@ -923,28 +923,6 @@ while True:
                 r"X   ignore wspace and comment" + "\n" \
                 r"A   \w\W\b\B\d\D ascii setted"
         popup(mex, scr=True)
-    # elif event == "regfun":
-    #     presub[1] = values['subbox'][:-1] if presub[0] in ("sub", "subn") else "" #X BUG MULTILINE
-    #     if values['regfun'] == "split":
-    #         window['cntbox'].update(disabled=False)
-    #         window['cntbox'].update(text_color="black")
-    #         window['subbox'].update("")
-    #         window['subbox'].update(text_color="#d9d9d9")
-    #         window['subbox'].update(disabled=True)
-    #     elif values['regfun'] in ("sub", "subn"):
-    #         window['cntbox'].update(disabled=False)
-    #         window['cntbox'].update(text_color="black")
-    #         window['subbox'].update(disabled=False)
-    #         window['subbox'].update(text_color="black")
-    #         window['subbox'].update(presub[1])  #X BUG MULTILINE
-    #     else:
-    #         window['cntbox'].update("0")
-    #         window['cntbox'].update(text_color="#d9d9d9")
-    #         window['cntbox'].update(disabled=True)
-    #         window['subbox'].update("")
-    #         window['subbox'].update(text_color="#d9d9d9")
-    #         window['subbox'].update(disabled=True)
-    #     presub[0] = values['regfun']
     elif event == "new":
         recnew = Record.capture(values)
         oksv = True
