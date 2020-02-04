@@ -4,8 +4,26 @@ import re, pathlib
 import PySimpleGUI as sg    #import PySimpleGUIWeb as sg
 import jsonpickle as json
 from datetime import datetime
-from time import monotonic as now 
+# from time import monotonic as now 
 json.set_encoder_options('json', sort_keys=True, indent=4)
+#endregion
+#region costanti 
+PRESET_DIM = None #((800, 0), (1104, 825), (5, 28))
+TFONT = "Monospace"
+DFONT = 20
+BFONT = (TFONT, DFONT)                  #big font
+SFONT = (TFONT, int(DFONT/3*2))         #font checkbox
+CH_FLEN = 30                            #full len in char of box
+CH_1_10 = int(CH_FLEN / 10)
+CH_9_10 = int(CH_FLEN / 15 * 13)
+# CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
+CH_SLEN = 17
+CH_FWID = 18                            #tot width char, hardcoded magicnumber
+STD_REGEX = {"data" : ["fun", "regex", "flag", "testo", 0, "replace"]}
+GENRE = ("findall", "fullmatch", "match", "search", "split", "sub", "subn")
+GENIN = GENRE[0]
+FLAGS_CMB = "ILMSUXA"
+DELAY = 1; DETAIL = DELAY/2         #elapsedtime/subdivision between checks
 #endregion
 
 def preset_dim(sg):
@@ -22,7 +40,7 @@ def preset_dim(sg):
     ((int,int),(int,int),(int,int))
         start position of the screen, dimension and decorator shift
     """
-     
+    if isinstance(PRESET_DIM, tuple): return PRESET_DIM
     win = sg.Window('mlw', [[]], alpha_channel=0)
     win.read(timeout=0)
     lc1 = win.current_location()
@@ -415,7 +433,8 @@ class Appendsave:
                         self.prev = self._next  #prima di uno stopiterator questa viene
                         self._next = next(self.schema_iter) #eseguita
                         return self._next
-                self._schema_last = schema #salvo l'ultimo schema passato
+                self._schema_last = schema  #salvo l'ultimo schema passato
+                self._record_last_len = 0   #lung ultimo record per validazione
                 schema = Validiter(schema)
 
             if val is None: #importa i dati e attiva la sstanza se si passa None a val
@@ -425,6 +444,7 @@ class Appendsave:
         if valida:  #valida schema
             try:
                 it_ind, it_lev, it_tip = next(schema)
+                self._record_last_len += 1
                 if not isinstance(val, it_tip) or it_lev != lev:
                     raise TypeError('corrispondenza invalida')
             except (TypeError, StopIteration):
@@ -460,6 +480,13 @@ class Appendsave:
                 if stampa: print("."*lev, val, sep='')
                 yield val
     def valida(self, val):
+        result = list(self.discendi(val, schema=self.schema))
+        lenv = self._record_last_len
+        lens = len(self.schema)
+        if lenv != lens:
+            er =  f"Validazione Fallita, schema non corrispondente:\n"\
+                  f"{lenv} elementi su un totale di {lens}"
+            raise TypeError(er)
         return list(self.discendi(val, schema=self.schema))
 
     def timestamp(self):
@@ -499,18 +526,23 @@ class Record:
     classe di supporto per poter avere oggetti e non stringhe combo box
     di pysimplegui. Viene ritornato __str__ 
     """
+    prefun = GENIN
+    presub = ''
 
     @property
     def record(self):
-        return {self.key : [self.regex, self.flags, self.text]}
+        return {self.key : [self.fun, self.regex, self.flags, self.text, self.count, self.replace]}
     @record.setter
     def record(self, dati):
         key = next(iter(dati.keys()))
         dati = dati[key]
-        self.key = key
-        self.regex = dati[0]
-        self.flags = dati[1]
-        self.text =  dati[2]
+        self.key     = key
+        self.fun     = dati[0]
+        self.regex   = dati[1]
+        self.flags   = dati[2]
+        self.text    = dati[3]
+        self.count   = dati[4]
+        self.replace = dati[5]
 
     def __init__(self, *record):
         """
@@ -524,22 +556,14 @@ class Record:
             record = record[0]
             self.record = record
         else:
-            att = ['key', 'regex', 'flags', 'text']
+            att = ['key', 'fun', 'regex', 'flags', 'text', 'count', 'replace']
             rec = [store.timestamp()] + list(record) + [""]*(len(att)-1-len(record))
             for a,v in zip(att, rec):
+                if a == 'fun' and not v: v = "findall"  #valori di default per
+                elif a == 'count' and not v: v = 0    #evitare i campi vuoti
                 self.__setattr__(a,v)
-        # elif len(record) == 3:
-        #     key = store.timestamp()
-        #     self.key = key
-        #     self.regex = record[0]
-        #     self.flags = record[1]
-        #     self.text = record[2]
-        # else:
-        #     self.key = store.timestamp()
-        #     self.regex = self.flags = self.text = ''
-            # raise ValueError("record inserted with wrong element number")
     def __str__(self):
-        return self.record[self.key][0]
+        return self.record[self.key][1]
     def __eq__(self, other):
         """
         vero se gli elementi sono uguali (le chiavi non sono importanti)
@@ -557,26 +581,110 @@ class Record:
         return all(a==b for a,b in zip(self.record.values(), other.record.values()))
     def is_empty(self):
         """return True if the record is void"""
-        return not any((self.regex, self.flags, self.text))
+        return not any((self.regex, self.flags, self.text, self.count, self.replace))
     def is_saved(self):
         """return True if record is already saved"""
         return any(self == Record(s) for s in store.elenca())
     @classmethod
     def capture(cls, values):
+        """
+        return a Record object from the current data showed in the gui
+        
+        Parameters
+        ----------
+        values : values from Window.read()
+            data returned from Window of pysimplegui
+        
+        Returns
+        -------
+        Record
+            current data object
+        """
+        fun = values['regfun']
         regex = values['regbox'][:-1]
         flags = ''.join([f for f in FLAGS_CMB  if values[f]])
         text = values['text'][:-1]
-        return cls(regex, flags, text)
+        count = values['cntbox']
+        count = int(count) if count.isdecimal() else 0
+        rep = values['subbox']
+        replace = values['subbox'][:-1] if values['subbox'] != "None\n" else '' #X BUG MULTILINE
+        return cls(fun, regex, flags, text, count, replace)
+    @classmethod
+    def gui_adapt(cls, window, record):
+        if record.fun != cls.prefun:                #se cambia funzione
+            # print(f"{cls.prefun} > {record.fun}")
+            if record.fun in ("sub", "subn"):       #in una sub
+                if cls.prefun in ("sub", "subn"):   #ed era una sub
+                    cls.presub = record.replace     #registro il valore per precedente
+                else: 
+                    if cls.prefun != "split":
+                        window['cntbox'].update(disabled=False)
+                        window['cntbox'].update(text_color="black")
+                    window['subbox'].update(disabled=False)
+                    window['subbox'].update(text_color="black")
+                    window['subbox'].update(cls.presub)  #X BUG MULTILINE
+            elif record.fun == "split":
+                if cls.prefun in ("sub", "subn"):
+                    cls.presub = ""
+                    window['subbox'].update("")
+                    window['subbox'].update(text_color="#d9d9d9")
+                    window['subbox'].update(disabled=True)
+                window['cntbox'].update(disabled=False)
+                window['cntbox'].update(text_color="black")
+            else:
+                if cls.prefun in ("split", "sub", "subn"):
+                    window['cntbox'].update("0")
+                    window['cntbox'].update(text_color="#d9d9d9")
+                    window['cntbox'].update(disabled=True)
+                    if cls.prefun != "split":
+                        cls.presub = ""
+                        window['subbox'].update("")
+                        window['subbox'].update(text_color="#d9d9d9")
+                        window['subbox'].update(disabled=True)
+            cls.prefun = record.fun
+    @classmethod
+    def capturegex(cls, values, window):
+        """
+        capture current data from gui and execute a debounced regex
+        
+        Parameters
+        ----------
+        values : values of pysimplegui Window.read()
+            data captured from the gui
+        
+        Returns
+        -------
+        list or None
+            list of regex occurrencies
+        """
+        r = cls.capture(values)
+        cls.gui_adapt(window, r)
+        flags = [f for f in FLAGS_CMB  if values[f]]
+        flags = sum([eval("re."+f) for f in flags])
+        return regexer(r.fun, r.text, r.regex, flags, r.count, r.replace)
     @classmethod
     def show(cls, window, *record):
+        """
+        show specified record ok the interface
+    
+        Parameters
+        ----------
+        window : Window
+            istance of pysimplegui
+        record : Record or data
+            it is ok to pass a Record object or a record data
+        """
         if len(record) == 1 and isinstance(record[0], Record):
             record = record[0]
-        else:
-            record = Record(*record)
-        window['regbox'].update(record)
+        else: record = Record(*record)
+        cls.gui_adapt(window, record)
+        window['regfun'].update(record.fun)
+        window['regbox'].update(record.regex)
         for f in FLAGS_CMB :
             window[f].update(f in record.flags)
-        window['text'].update(record)
+        window['text'].update(record.text)
+        window['cntbox'].update(record.count)
+        window['subbox'].update(record.replace)
     @classmethod
     def updatelist(cls, window, record=None):
         """
@@ -600,20 +708,71 @@ class Record:
         window['savedlist'].update(record, saved)
         return saved
 
-
+def throttle_debounce(tic, wait):
+    """
+    decoratore che posticipa l'esecuzine della funzione decorata, si
+    sottointende l'uso lanciando la funzione ad intervalli regolari.
+    la funzione decorata viene avviata solo quando non ci sono più
+    cambiamenti da un numero di volte di tic in wait.
+    
+    Parameters
+    ----------
+    tic : int
+        la duranta di un intervallo di scansione
+    wait : int
+        il delay di attesa, è da considerarsi più come numero tic
+        che di sencondi che devono passare (a meno che un tic==1sec)
+    
+    Returns
+    -------
+    function
+        decorated function
+    """
+    def decorate(delayedfun):
+        _start = 0
+        _value = None
+        _lst_e = None
+        def wrap(*args, **kwargs):
+            nonlocal _start, _value, _lst_e
+            val = (args, kwargs)
+            if val != _lst_e:       #ho fatto una modifica
+                _start = 0
+                _lst_e = val
+            elif _lst_e != _value:  #ho smesso di fare modifiche
+                _start += tic
+                if _start >= wait:  #ho smesso per n volte
+                   _value = val
+                   _start = 0
+                   result = delayedfun(*args, **kwargs)
+                   return result
+        return wrap
+    return decorate
+@throttle_debounce(DETAIL, DELAY)
+def regexer(fun, text, regex, flags=0, count=0, replace=""):
+    #non compilo la regex perché i metodi usano una già incorporata
+    if fun in ('fullmatch', 'match', 'search'):
+        result = getattr(re, fun)(regex, text, flags)
+        if result is not None:
+            result = result.regs
+            if result == ((0, 0),): result = ('',)
+        else: result = ()
+    elif fun == 'findall':
+        result = re.findall(regex, text, flags)
+    elif fun == "split":
+        result = re.split(regex, text, count, flags)
+    elif fun in ('sub', 'subn'):
+        result = [getattr(re, fun)(regex, replace, text, count, flags)]
+    else:
+        result = [""]
+    return result
+    
 sg.theme('BrightColors')
-DFONT = ("Monospace", 20)               #def font
-SFONT = (DFONT[0], int(DFONT[1]/10*9))  #font checkbox
-CH_FLEN = 30                            #full len in char of box
-# CH_SLEN = int(CH_FLEN/3*2)            #len in char of combobox 2/3
-CH_SLEN = 17
-CH_FWID = 17                            #tot width char, hardcoded magicnumber
-STD_REGEX = {"data" : ["regex", "flag", "testo"]}
 store = Appendsave(STD_REGEX)
 saved = [Record(r) for r in store.elenca()]
 layout = [
-    [   
-        sg.Button('?', key='help', tooltip="help"),
+    [
+        sg.Combo(GENRE, GENIN, (9,1), key='regfun', font=SFONT, readonly=True),
+        # sg.Text("", size=(0,0)),
         sg.Checkbox("I", key="I", font=SFONT, tooltip="IGNORECASE"),
         sg.Checkbox("L", key="L", font=SFONT, tooltip="LOCALE (only with byte pattern)", disabled=True),
         sg.Checkbox("M", key="M", font=SFONT, tooltip="MULTILINE"),
@@ -621,14 +780,18 @@ layout = [
         sg.Checkbox("U", key="U", font=SFONT, tooltip="UNICODE (default if not ascii)", disabled=True),
         sg.Checkbox("X", key="X", font=SFONT, tooltip="VERBOSE"),
         sg.Checkbox("A", key="A", font=SFONT, tooltip="ASCII"),
+        sg.VerticalSeparator(),
+        sg.Button('?', key='help', font=SFONT, tooltip="help"),
+    ],    
+    [   
+        sg.InputText("0", (CH_1_10,1), True, key="cntbox", justification='right',
+                     visible=True, background_color="#d9d9d9", text_color="#d9d9d9"), 
+        sg.VerticalSeparator(pad=(0,1)),
+        sg.Multiline(size=(CH_9_10,1), disabled=False, key="subbox", autoscroll=True,
+                     visible=True, background_color="#d9d9d9", text_color="#d9d9d9"),
     ],
-    [sg.Multiline(key="regbox", size=(CH_FLEN,3), autoscroll=True,
-                  focus=True, # ~ enable_events=True, 
-                  enter_submits=True, do_not_clear=True,
-    )],
-    [sg.Multiline(key="text", size=(CH_FLEN,6), autoscroll=True,
-                  enter_submits=True, do_not_clear=True,
-    )],
+    [sg.Multiline(key="regbox", size=(CH_FLEN,3), autoscroll=True, focus=True)],
+    [sg.Multiline(key="text", size=(CH_FLEN,6), autoscroll=True)],
     [sg.Multiline(key="result", size=(CH_FLEN, 6), autoscroll=True, disabled=True)],
     [   
         sg.Button('N', key='new', tooltip="new"),
@@ -642,19 +805,20 @@ layout = [
 #multiline ha sempre un \n alla fine anche se è vuoto
 #Output cattura anche stder e stdout!
 
-
 #region calcolo posizione finestra quando la creo 
-if sg.name == "PySimpleGUI":
+if sg.__name__ == "PySimpleGUI":
     SLOC, SSIZ, SDEC = preset_dim(sg) 
     offset = map(sum, zip(SLOC, map(lambda n: n//4, SSIZ)))
     window = sg.Window("rg", layout, location=offset,
-                        font=("Default", 20))
-elif sg.name == "PySimpleGUIWeb":
-    window = sg.Window("rg", layout, font=DFONT)
+                        font=("Default", 20))#, element_justification="right")
+elif sg.__name__ == "PySimpleGUIWeb":
+    window = sg.Window("rg", layout, font=BFONT)
 #endregion
 #window['savedlist'].expand(True) #non funge, come espandere combo?
+window.finalize(); window['subbox'].update(disabled=True) #X BUG MULTILINE
 
-def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_FWID)):
+
+def popup(mex, y_n=False, scr=False, font=BFONT, pos=window, siz=(CH_FLEN+1,CH_FWID), title=''):
     """
     shorcut to preconfigured popup format
     
@@ -667,7 +831,7 @@ def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_F
     scr : bool, optional
         if popup is scrollable (disable y_n), by default False
     font : tuple, optional
-        font format of pysimplegui, by default DFONT
+        font format of pysimplegui, by default BFONT
     pos : (int,int), optional
         upper-left position of the popup, can be windows object and
         reflect topleft of window, or PySimpleGUI module and reflect
@@ -683,51 +847,34 @@ def popup(mex, y_n=False, scr=False, font=DFONT, pos=window, siz=(CH_FLEN+1,CH_F
     if not isinstance(pos, tuple):
         pos = tuple(a-b for a,b in zip(pos.current_location(), SDEC)) 
     if scr:
-        res = sg.popup_scrolled(mex, font=font, location=pos, size=siz, non_blocking=True, keep_on_top=True)
+        res = sg.popup_scrolled(mex, title=title, font=font, location=pos, size=siz, non_blocking=True, keep_on_top=True)
     else:
         poop = sg.popup_yes_no if y_n else sg.popup
         res = poop(mex, font=font, location=pos, keep_on_top=True)
     return True if res == "Yes" else False
-PARSE_DELAY = 1
-FLAGS_CMB  = "ILMSUXA"
-parse = False
-regex = regtext = text = flags_old = ""
-start_cron = now()
+
+
+regex = regtext = text = ""
+flags = 0
+presub = [GENIN, ''] #X BUG MULTILINE
 while True:
     #ogni secondo rilascio uno stato
-    event, values = window.read(timeout=1000)  #un controllo al sec
+    event, values = window.read(timeout=DETAIL*1000)  #un controllo al sec
     #dovrebbe togliere il focus quando si switcha con tab, ma...
-    if sg.name == "PySimpleGUI":
-        window['result'].Widget.config(takefocus=0)
-
-    if event is None:   #se premo su esc, escio
-        break 
-    elif event == "__TIMEOUT__": #nel caso l'evento sia la cadenza di aggiorn
-        #se la regex è cambiata l'aggiorno, [:-1] tolgo l'\n alla fine
-        flags_new = [f for f in FLAGS_CMB  if values[f]]
-        if (flags_old != flags_new) or (regtext != values['regbox'][:-1]):
-            flags_old = flags_new
-            flags_sum = sum([eval("re."+f) for f in flags_old])
-            regtext = values['regbox'][:-1]
-            try:                regex = re.compile(regtext, flags_sum)
-            except re.error:    regex = ''
-            parse = True
-            start_cron = now()
-        if text != values['text'][:-1]:     #se il testo è cambiato l'aggiorno
-            text = values['text'][:-1]
-            parse = True
-            start_cron = now()
-        if parse:
-            if now()-start_cron >= PARSE_DELAY: 
-                parse = False
-                result = re.findall(regex, text)
-                if not regtext: #con "" findall restituisce risultati vuoti
-                    result = [s for s in result if s] #non consento
+    # if sg.name == "PySimpleGUI":
+        # window['result'].Widget.config(takefocus=0)
+    if event is None:   break       #quit dal programma
+    elif event == "__TIMEOUT__":    #ad ogni cadenza
+        try: result = Record.capturegex(values, window) #meglio accettare record da regexer?
+        except re.error: result = None
+        if result is not None:
+            if result and any(result):
                 lr = len(str(len(result)))
                 result = [f"{n:0{lr}}) {s}" for n, s in enumerate(result,1)]
                 result = "\n".join(result)
                 window['result'].update(result)
-                start_cron = now()
+            else:
+                window['result'].update('')
     elif event == "help":
         mex =   r"Special Character (_ for cont)" + "\n" \
                 r".   all except newline(dotall)" + "\n" \
@@ -773,8 +920,16 @@ while True:
                 r"S   . match any char also \n" + "\n" \
                 r"U - unicode, default no ascii " + "\n" \
                 r"X   ignore wspace and comment" + "\n" \
-                r"A   \w\W\b\B\d\D ascii setted"
-        popup(mex, scr=True)
+                r"A   \w\W\b\B\d\D ascii setted" + "\n" \
+                r"    " + "\n" \
+                r"Methods Description" + "\n" \
+                r"findall find all occurrencies" + "\n" \
+                r"fullmatch match complete strin" + "\n" \
+                r"match match string from start" + "\n" \
+                r"split split strin with pattern" + "\n" \
+                r"sub sub pattern with replacmnt" + "\n" \
+                r"subn like sub but with total"
+        popup(mex, scr=True, title="help")
     elif event == "new":
         recnew = Record.capture(values)
         oksv = True
@@ -807,7 +962,8 @@ while True:
                 oksv = True
                 if not recnew.is_empty() and not recnew.is_saved():
                     oksv = popup("The current work is not saved, procede anyway?", True)
-                if oksv: Record.show(window, recsav)
+                if oksv:
+                    Record.show(window, recsav)
             else:
                 popup("you load save with same content")
         else:
@@ -825,25 +981,21 @@ window.close()
 
 ### SAVE ###
 #{
-#    "20200129125124360072": [
-#        "prova",
+#    "20200203063737013562": [
+#        "sub",
+#        "x",
 #        "",
-#        "prova"
+#        "axantiaro",
+#        0,
+#        "-"
 #    ],
-#    "20200129142532727748": [
-#        "prova2",
-#        "SA",
-#        "prova2"
-#    ],
-#    "20200129145430965394": [
-#        "oizx",
-#        "M",
-#        "oizx"
-#    ],
-#    "20200129152220108800": [
-#        "lol",
-#        "",
-#        "lol"
+#    "20200203081159421104": [
+#        "split",
+#        "a",
+#        "I",
+#        "tanerArqeataz",
+#        3,
+#        ""
 #    ]
 #}
 ### FINE ###
