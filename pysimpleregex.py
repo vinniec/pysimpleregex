@@ -8,7 +8,7 @@ from datetime import datetime
 json.set_encoder_options('json', sort_keys=True, indent=4)
 #endregion
 #region costanti 
-PRESET_DIM = ((800, 0), (1104, 825), (5, 28))
+PRESET_DIM = None #((800, 0), (1104, 825), (5, 28))
 TFONT = "Monospace"
 DFONT = 20
 BFONT = (TFONT, DFONT)                  #big font
@@ -612,7 +612,7 @@ class Record:
     @classmethod
     def gui_adapt(cls, window, record):
         if record.fun != cls.prefun:                #se cambia funzione
-            print(cls.prefun, record.fun)
+            # print(f"{cls.prefun} > {record.fun}")
             if record.fun in ("sub", "subn"):       #in una sub
                 if cls.prefun in ("sub", "subn"):   #ed era una sub
                     cls.presub = record.replace     #registro il valore per precedente
@@ -771,7 +771,7 @@ store = Appendsave(STD_REGEX)
 saved = [Record(r) for r in store.elenca()]
 layout = [
     [
-        sg.Combo(GENRE, GENIN, (9,1), key='regfun', font=SFONT, readonly=True, enable_events=True),
+        sg.Combo(GENRE, GENIN, (9,1), key='regfun', font=SFONT, readonly=True),
         # sg.Text("", size=(0,0)),
         sg.Checkbox("I", key="I", font=SFONT, tooltip="IGNORECASE"),
         sg.Checkbox("L", key="L", font=SFONT, tooltip="LOCALE (only with byte pattern)", disabled=True),
@@ -818,7 +818,7 @@ elif sg.__name__ == "PySimpleGUIWeb":
 window.finalize(); window['subbox'].update(disabled=True) #X BUG MULTILINE
 
 
-def popup(mex, y_n=False, scr=False, font=BFONT, pos=window, siz=(CH_FLEN+1,CH_FWID)):
+def popup(mex, y_n=False, scr=False, font=BFONT, pos=window, siz=(CH_FLEN+1,CH_FWID), title=''):
     """
     shorcut to preconfigured popup format
     
@@ -847,13 +847,11 @@ def popup(mex, y_n=False, scr=False, font=BFONT, pos=window, siz=(CH_FLEN+1,CH_F
     if not isinstance(pos, tuple):
         pos = tuple(a-b for a,b in zip(pos.current_location(), SDEC)) 
     if scr:
-        res = sg.popup_scrolled(mex, font=font, location=pos, size=siz, non_blocking=True, keep_on_top=True)
+        res = sg.popup_scrolled(mex, title=title, font=font, location=pos, size=siz, non_blocking=True, keep_on_top=True)
     else:
         poop = sg.popup_yes_no if y_n else sg.popup
         res = poop(mex, font=font, location=pos, keep_on_top=True)
     return True if res == "Yes" else False
-    
-    if fun == "findall": re
 
 
 regex = regtext = text = ""
@@ -867,7 +865,8 @@ while True:
         # window['result'].Widget.config(takefocus=0)
     if event is None:   break       #quit dal programma
     elif event == "__TIMEOUT__":    #ad ogni cadenza
-        result = Record.capturegex(values, window) #meglio accettare record da regexer?
+        try: result = Record.capturegex(values, window) #meglio accettare record da regexer?
+        except re.error: result = None
         if result is not None:
             if result and any(result):
                 lr = len(str(len(result)))
@@ -921,8 +920,16 @@ while True:
                 r"S   . match any char also \n" + "\n" \
                 r"U - unicode, default no ascii " + "\n" \
                 r"X   ignore wspace and comment" + "\n" \
-                r"A   \w\W\b\B\d\D ascii setted"
-        popup(mex, scr=True)
+                r"A   \w\W\b\B\d\D ascii setted" + "\n" \
+                r"    " + "\n" \
+                r"Methods Description" + "\n" \
+                r"findall find all occurrencies" + "\n" \
+                r"fullmatch match complete strin" + "\n" \
+                r"match match string from start" + "\n" \
+                r"split split strin with pattern" + "\n" \
+                r"sub sub pattern with replacmnt" + "\n" \
+                r"subn like sub but with total"
+        popup(mex, scr=True, title="help")
     elif event == "new":
         recnew = Record.capture(values)
         oksv = True
