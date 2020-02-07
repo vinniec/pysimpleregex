@@ -806,12 +806,12 @@ layout = [
 #Output cattura anche stder e stdout!
 
 #region calcolo posizione finestra quando la creo 
-if sg.__name__ == "PySimpleGUI":
+if sg.port == "PySimpleGUI":
     SLOC, SSIZ, SDEC = preset_dim(sg) 
     offset = map(sum, zip(SLOC, map(lambda n: n//4, SSIZ)))
     window = sg.Window("rg", layout, location=offset,
                         font=("Default", 20))#, element_justification="right")
-elif sg.__name__ == "PySimpleGUIWeb":
+elif sg.port == "PySimpleGUIWeb":
     window = sg.Window("rg", layout, font=BFONT)
 #endregion
 #window['savedlist'].expand(True) #non funge, come espandere combo?
@@ -866,7 +866,7 @@ while True:
     if event is None:   break       #quit dal programma
     elif event == "__TIMEOUT__":    #ad ogni cadenza
         try: result = Record.capturegex(values, window) #meglio accettare record da regexer?
-        except re.error: result = None
+        except re.error: result = ""
         if result is not None:
             if result and any(result):
                 lr = len(str(len(result)))
@@ -892,7 +892,7 @@ while True:
                 r"(?:_)nogroup match, no accessb  " + "\n" \
                 r"(?P<name>_)groupmtch \name acc" + "\n" \
                 r"(?P=name_)match previous again" + "\n" \
-                r"(?#_) ignored comment" + "\n" \
+                r"(?#_) ignored comment (flag x)" + "\n" \
                 r"(?=_)if next is _ noconsum str" + "\n" \
                 r"(?!_)if next is not _" + "\n" \
                 r"(?<=_)if preceded by _ fix len" + "\n" \
@@ -904,7 +904,7 @@ while True:
                 r"\A  match only at start of str" + "\n" \
                 r"\Z  match only at end of strin" + "\n" \
                 r"\b  m. empty strn outside word" + "\n" \
-                r"\B  m. emptu strng inside word" + "\n" \
+                r"\B  m. empty strng inside word" + "\n" \
                 r"\d  all digits, in ascii [0-9]" + "\n" \
                 r"\D  all non digits equiv [^\d]" + "\n" \
                 r"\s  allspace,asci[ \t\n\r\f\v]" + "\n" \
@@ -912,7 +912,25 @@ while True:
                 r"\w  all alphanum,a[a-zA-Z0-9_]" + "\n" \
                 r"\W  \w complement, equiv [^\w]" + "\n" \
                 r"\\  literal backslash" + "\n" \
-                r"    " + "\n" \
+                r"" + "\n" \
+                r"Py escape sequence (- no work)" + "\n" \
+                r"\\   \ backslash, like regex" + "\n" \
+                r"\'   ' singlequote" + "\n" \
+                r'\"   " doublequote' + "\n" \
+                r"\a -   ascii bell" + "\n" \
+                r"\b -   backspace sub regex \b" + "\n" \
+                r"\f -   line feed" + "\n" \
+                r"\n     newline" + "\n" \
+                r"\r -   return carriage" + "\n" \
+                r"\t     tabulation horizzontal" + "\n" \
+                r"\v -   tabulation vertical" + "\n" \
+                r"\ooo   octal seq \101 == A" + "\n" \
+                r"\xhh   hexad seq  8b \x41 == A" + "\n" \
+                r"\uxxxx hexad 16b \u0041 == A" + "\n" \
+                r"\uxxxxxxxx h32b\u00000041 == A" + "\n" \
+                r"\N{name} - unicode name {tab}" + "\n" \
+                r"\newline - literally newline" + "\n" \
+                r"" + "\n" \
                 r"Flag Description (- disabled)" + "\n" \
                 r"I   ignore case sensitive" + "\n" \
                 r"L - \w\W\b\B locale dependent" + "\n" \
@@ -926,6 +944,7 @@ while True:
                 r"findall find all occurrencies" + "\n" \
                 r"fullmatch match complete strin" + "\n" \
                 r"match match string from start" + "\n" \
+                r"search search pattern in text" + "\n" \
                 r"split split strin with pattern" + "\n" \
                 r"sub sub pattern with replacmnt" + "\n" \
                 r"subn like sub but with total"
@@ -980,22 +999,5 @@ while True:
 window.close()
 
 ### SAVE ###
-#{
-#    "20200203063737013562": [
-#        "sub",
-#        "x",
-#        "",
-#        "axantiaro",
-#        0,
-#        "-"
-#    ],
-#    "20200203081159421104": [
-#        "split",
-#        "a",
-#        "I",
-#        "tanerArqeataz",
-#        3,
-#        ""
-#    ]
-#}
+#{}
 ### FINE ###
