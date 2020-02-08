@@ -854,9 +854,6 @@ def popup(mex, y_n=False, scr=False, font=BFONT, pos=window, siz=(CH_FLEN+1,CH_F
     return True if res == "Yes" else False
 
 
-regex = regtext = text = ""
-flags = 0
-presub = [GENIN, ''] #X BUG MULTILINE
 while True:
     #ogni secondo rilascio uno stato
     event, values = window.read(timeout=DETAIL*1000)  #un controllo al sec
